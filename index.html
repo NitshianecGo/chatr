@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Chat App</title>
-  <!-- Firebase SDK (Compat) -->
+  <title>Chat App - 5 новых звонков</title>
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <!-- simple-peer -->
   <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
   <style>
-    /* ===== ОСНОВНЫЕ СТИЛИ (без изменений) ===== */
+    /* (стили те же, что и раньше, без изменений) */
     :root {
       --bg-body: #0f172a;
       --bg-app: #1e293b;
@@ -25,7 +25,6 @@
       --msg-received: #334155;
       --msg-received-text: #f8fafc;
     }
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -60,7 +59,6 @@
     }
     #home h1 { font-size: 2rem; margin-bottom: 10px; }
     #home p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; }
-    
     .btn {
       background: var(--primary);
       color: white;
@@ -76,7 +74,6 @@
       gap: 8px;
     }
     .btn:hover { background: var(--primary-hover); }
-
     #chat { display: none; flex-direction: column; height: 100%; }
     #header {
       padding: 8px 12px;
@@ -99,7 +96,7 @@
     #header-actions button {
       background: none;
       border: none;
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       cursor: pointer;
       padding: 4px 6px;
       border-radius: 6px;
@@ -107,15 +104,7 @@
       background: var(--border-color);
     }
     #header-actions button:hover { background: var(--primary); }
-
-    /* Стили для кнопок звонков с номерами */
-    .call-btn {
-      font-size: 0.7rem !important;
-      padding: 2px 6px !important;
-      min-width: 30px;
-    }
-    .call-btn.active { background: var(--primary); }
-
+    .call-btn { font-size: 0.65rem !important; padding: 2px 5px !important; min-width: 28px; }
     #messages {
       flex: 1;
       overflow-y: auto;
@@ -150,12 +139,7 @@
     .msg-sent .msg-name { color: #bfdbfe; }
     .msg-time { font-size: 0.65rem; opacity: 0.7; margin-top: 4px; text-align: right; }
     .msg-audio audio { max-width: 200px; height: 36px; }
-    .msg-photo img {
-      max-width: 200px;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-    }
-
+    .msg-photo img { max-width: 200px; border-radius: 12px; border: 1px solid var(--border-color); }
     #emoji-picker {
       display: none;
       padding: 8px;
@@ -167,7 +151,6 @@
       overflow-y: auto;
     }
     #emoji-picker span { font-size: 1.3rem; cursor: pointer; padding: 4px; }
-
     #input-area {
       padding: 10px 12px;
       background: var(--bg-app);
@@ -208,8 +191,6 @@
       font-size: 1.1rem;
       cursor: pointer;
     }
-
-    /* Модалка для селфи */
     #selfie-modal {
       display: none;
       position: absolute;
@@ -226,7 +207,7 @@
       max-width: 320px;
       border-radius: 20px;
       background: #000;
-      transform: scaleX(-1); /* Зеркальное отображение */
+      transform: scaleX(-1);
     }
     #selfie-controls {
       display: flex;
@@ -244,8 +225,6 @@
       cursor: pointer;
     }
     #selfie-controls .close-btn { background: #ef4444; }
-
-    /* Звонки */
     #call-container {
       display: none;
       position: absolute;
@@ -268,7 +247,6 @@
       font-size: 1.4rem; cursor: pointer; margin-top: 20px;
     }
     .call-info { color: white; font-size: 1.1rem; margin-bottom: 15px; font-weight: 600; }
-
     #incoming-call-modal {
       display: none;
       position: absolute;
@@ -301,7 +279,7 @@
 <div id="app">
   <div id="home">
     <h1>📱 Chat Test</h1>
-    <p>Аудиозвонки × 5 конфигураций</p>
+    <p>5 новых аудиозвонков</p>
     <button class="btn" id="createRoomBtn">➕ Создать комнату</button>
   </div>
 
@@ -310,13 +288,12 @@
       <h2 id="roomTitle">Комната</h2>
       <div id="header-actions">
         <button id="copyLinkBtn" title="Скопировать ссылку">🔗</button>
-        <!-- 5 кнопок для аудиозвонков -->
+        <!-- 5 новых кнопок -->
         <button class="call-btn" data-config="0">📞1</button>
         <button class="call-btn" data-config="1">📞2</button>
         <button class="call-btn" data-config="2">📞3</button>
         <button class="call-btn" data-config="3">📞4</button>
         <button class="call-btn" data-config="4">📞5</button>
-        <!-- Видеозвонок (стандартный) -->
         <button id="videoCallBtn" title="Видеозвонок">📹</button>
         <button id="leaveRoomBtn" title="Выйти">✕</button>
       </div>
@@ -337,7 +314,7 @@
     </div>
   </div>
 
-  <!-- Модалка для селфи -->
+  <!-- Селфи -->
   <div id="selfie-modal">
     <video id="selfie-video" autoplay playsinline muted></video>
     <div id="selfie-controls">
@@ -380,7 +357,6 @@ const firebaseConfig = {
   messagingSenderId: "901741126959",
   appId: "1:901741126959:web:97734153fa537a5ab16dda"
 };
-
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -392,10 +368,7 @@ const processedMsgIds = new Set();
 let participants = {};
 
 let peer = null, localStream = null, isCallActive = false, pendingCallData = null;
-
 let mediaRecorder = null, audioChunks = [], isRecording = false;
-
-// Для селфи
 let selfieStream = null;
 
 // DOM
@@ -430,6 +403,58 @@ const selfieModal = document.getElementById('selfie-modal');
 const selfieVideo = document.getElementById('selfie-video');
 const takeSelfieBtn = document.getElementById('takeSelfieBtn');
 const closeSelfieBtn = document.getElementById('closeSelfieBtn');
+
+// ============================ НОВЫЕ 5 КОНФИГУРАЦИЙ ============================
+const callConfigs = [
+  {
+    name: 'Максимум STUN',
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun.ekiga.net' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    ],
+    trickle: true
+  },
+  {
+    name: 'TURN OpenRelay',
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'turn:openrelay.metered.ca:80' },
+      { urls: 'turn:openrelay.metered.ca:443' },
+      { urls: 'turn:openrelay.metered.ca:3478' }
+    ],
+    trickle: true
+  },
+  {
+    name: 'TURN Twilio (бесплатный)',
+    iceServers: [
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      { urls: 'turn:global.turn.twilio.com:3478?transport=udp' },
+      { urls: 'turn:global.turn.twilio.com:3478?transport=tcp' }
+    ],
+    trickle: true
+  },
+  {
+    name: 'TURN Metered.ca',
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'turn:turn.metered.ca:80' },
+      { urls: 'turn:turn.metered.ca:443' },
+      { urls: 'turn:turn.metered.ca:3478' }
+    ],
+    trickle: true
+  },
+  {
+    name: 'Комбо + trickle:false',
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      { urls: 'turn:openrelay.metered.ca:3478' }
+    ],
+    trickle: false
+  }
+];
 
 // ============================ ВСПОМОГАТЕЛЬНЫЕ ============================
 function generateRandomName() {
@@ -518,7 +543,7 @@ copyLinkBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(link).then(() => alert('Ссылка скопирована!'));
 });
 
-// ============================ ОТРИСОВКА СООБЩЕНИЙ ============================
+// ============================ ОТРИСОВКА ============================
 function renderSingleMessage(id, msg) {
   const isOwn = msg.senderId === myUserId;
   const div = document.createElement('div');
@@ -560,7 +585,7 @@ function renderSingleMessage(id, msg) {
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// ============================ ОТПРАВКА СООБЩЕНИЙ ============================
+// ============================ ОТПРАВКА ============================
 async function sendTextMessage(text) {
   if (!text.trim() || !roomId) return;
   await messagesRef.add({
@@ -631,7 +656,7 @@ recordBtn.addEventListener('click', async () => {
   }
 });
 
-// ============================ СЕЛФИ (ЗЕРКАЛЬНАЯ КАМЕРА) ============================
+// ============================ СЕЛФИ ============================
 selfieBtn.addEventListener('click', async () => {
   try {
     selfieStream = await navigator.mediaDevices.getUserMedia({
@@ -657,12 +682,10 @@ function closeSelfie() {
 
 takeSelfieBtn.addEventListener('click', () => {
   if (!selfieStream) return;
-  // Захватываем кадр с зеркальным отражением
   const canvas = document.createElement('canvas');
   canvas.width = 320;
   canvas.height = 320;
   const ctx = canvas.getContext('2d');
-  // Отражаем по горизонтали (зеркально)
   ctx.translate(canvas.width, 0);
   ctx.scale(-1, 1);
   ctx.drawImage(selfieVideo, 0, 0, canvas.width, canvas.height);
@@ -671,50 +694,40 @@ takeSelfieBtn.addEventListener('click', () => {
   closeSelfie();
 });
 
-// ============================ АУДИОЗВОНКИ (5 КОНФИГУРАЦИЙ) ============================
-// Массив конфигураций
-const callConfigs = [
-  { name: 'Стандартный', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], trickle: true },
-  { name: 'Только STUN', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }], trickle: true },
-  { name: 'Доп. STUN', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.ekiga.net' }], trickle: true },
-  { name: 'Trickle: false', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], trickle: false },
-  { name: 'С TURN', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:turn.anyfirewall.com:3478?transport=udp' }], trickle: true }
-];
-
-// Назначаем обработчики на 5 кнопок
+// ============================ ЗВОНКИ (ОБНОВЛЁННЫЕ) ============================
+// Обработчики кнопок аудиозвонков с передачей индекса конфигурации
 document.querySelectorAll('.call-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const idx = parseInt(btn.dataset.config);
     const config = callConfigs[idx];
-    console.log(`📞 Аудиозвонок с конфигурацией #${idx+1}: ${config.name}`);
-    startAudioCall(config);
+    console.log(`📞 Аудиозвонок #${idx+1}: ${config.name}`);
+    startCall(true, false, idx); // isInitiator=true, wantVideo=false
   });
 });
 
-function startAudioCall(config) {
+// Видеозвонок использует конфигурацию #0 (максимум STUN)
+videoCallBtn.addEventListener('click', () => {
+  console.log('📹 Видеозвонок (конфиг #0)');
+  startCall(true, true, 0);
+});
+
+// Общая функция инициации звонка с передачей индекса конфига
+function startCall(isInitiator, wantVideo, configIndex) {
   const targetId = Object.keys(participants).find(id => id !== myUserId);
   if (!targetId) {
     alert('Нет второго участника в комнате!');
     return;
   }
-  startPeerConnection(true, targetId, false, null, config);
+  startPeerConnection(isInitiator, targetId, wantVideo, null, configIndex);
 }
 
-// Видеозвонок (стандартный)
-videoCallBtn.addEventListener('click', () => {
-  const targetId = Object.keys(participants).find(id => id !== myUserId);
-  if (!targetId) return alert('Нет второго участника!');
-  startPeerConnection(true, targetId, true, null, { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], trickle: true });
-});
-
-// ============================ WEBRTC (ОБЩАЯ ФУНКЦИЯ) ============================
-async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomingSignal = null, config = null) {
+// ============================ WEBRTC (ОБНОВЛЁННЫЙ) ============================
+async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomingSignal = null, configIndex = 0) {
   if (peer) hangupCall();
 
-  // Если конфиг не передан, используем стандартный
-  if (!config) {
-    config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], trickle: true };
-  }
+  // Берём конфиг по индексу
+  const config = callConfigs[configIndex] || callConfigs[0];
+  console.log(`🔧 Используется конфигурация: ${config.name}, trickle: ${config.trickle}`);
 
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -730,17 +743,19 @@ async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomin
 
   peer = new SimplePeer({
     initiator: isInitiator,
-    trickle: config.trickle !== undefined ? config.trickle : true,
+    trickle: config.trickle,
     stream: localStream,
-    config: { iceServers: config.iceServers || [{ urls: 'stun:stun.l.google.com:19302' }] }
+    config: { iceServers: config.iceServers }
   });
 
   peer.on('signal', signal => {
+    // В сигнале передаём индекс конфигурации, чтобы отвечающий использовал ту же
     signalRef.add({
       from: myUserId,
       fromName: myName,
       target: targetUserId,
       callType: wantVideo ? 'video' : 'audio',
+      configIndex: configIndex,  // передаём индекс
       signal: signal,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -781,10 +796,17 @@ hangupBtn.addEventListener('click', hangupCall);
 
 // ============================ ВХОДЯЩИЕ ЗВОНКИ ============================
 function handleIncomingSignal(data) {
-  const { signal, from, fromName, callType } = data;
+  const { signal, from, fromName, callType, configIndex } = data;
 
   if (!isCallActive && !peer) {
-    pendingCallData = data;
+    // Сохраняем данные входящего звонка вместе с индексом конфига
+    pendingCallData = {
+      from,
+      fromName,
+      callType,
+      configIndex: configIndex || 0,  // если нет, используем 0
+      signal
+    };
     const isVideo = callType === 'video';
     incomingCallText.textContent = `Входящий ${isVideo ? 'видеозвонок' : 'аудиозвонок'} от ${fromName || 'участника'}`;
     incomingCallModal.style.display = 'flex';
@@ -796,8 +818,9 @@ function handleIncomingSignal(data) {
 acceptCallBtn.addEventListener('click', () => {
   incomingCallModal.style.display = 'none';
   if (pendingCallData) {
-    const { from, callType, signal } = pendingCallData;
-    startPeerConnection(false, from, callType === 'video', signal);
+    const { from, callType, configIndex, signal } = pendingCallData;
+    // Отвечаем с той же конфигурацией
+    startPeerConnection(false, from, callType === 'video', signal, configIndex);
     pendingCallData = null;
   }
 });
