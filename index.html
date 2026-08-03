@@ -281,14 +281,27 @@
 <script>
 // ============================ НАСТРОЙКА FIREBASE ============================
 // 🔥 ЗАМЕНИТЕ ЭТИ ДАННЫЕ НА СВОИ (из консоли Firebase)
+// Import the functions you need from the SDKs you need
+//import { initializeApp } from "firebase/app";
+//import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSy...",            // Ваш apiKey
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
+  authDomain: "chatt-6d410.firebaseapp.com",
+  projectId: "chatt-6d410",
+  storageBucket: "chatt-6d410.firebasestorage.app",
+  messagingSenderId: "901741126959",
+  appId: "1:901741126959:web:97734153fa537a5ab16dda",
+  measurementId: "G-H616TJEYXC"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
 // Инициализация Firebase
 firebase.initializeApp(firebaseConfig);
