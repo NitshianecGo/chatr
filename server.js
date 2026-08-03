@@ -1,181 +1,147 @@
-// server.js (Backend)
-
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
+const cors = require('cors');
 require('dotenv').config();
-const crypto = require('crypto'); // Импортируем для шифрования
 
 const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
+
 const server = http.createServer(app);
 const io = socketIo(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { origin: '*' },
+  pingTimeout: 60000,
 });
 
-// --- 1. МОДЕЛИ (Упрощенно) ---
-const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true },
-    passwordHash: { type: String, required: true }, // Хэш пароля
-});
-const User = mongoose.model('User', UserSchema);
-
-const MessageSchema = new mongoose.Schema({
-    chatId: { type: String, required: true },
-    senderId: { type: String, required: true },
-    text: { type: String, required: true }, // Текст сообщения (зашифрованный)
-    mediaUrl: { type: String, default: null }, // Ссылка на аудио/видео файл
-    timestamp: { type: Date, default: Date.now }
-});
-const Message = mongoose.model('Message', MessageSchema);
-
-
-// --- 2. MIDDLEWARE ---
-app.use(express.json());
-
-// --- 3. ПОДКЛЮЧЕНИЕ К БД ---
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-.then(() => console.log('✅ Backend: MongoDB успешно подключен!'))
-.catch(err => console.error('❌ Backend: Ошибка подключения к MongoDB:', err));
-
-
-// --- 4. API ЭНДПОИНТЫ (Аутентификация и Чат) ---
-
-// Регистрация пользователя
-app.post('/api/auth/register', async (req, res) => {
-    const { username, password } = req.body;
-    try {
-        // В реальном проекте здесь нужно использовать bcrypt для хеширования пароля!
-        const newUser = new User({ username, passwordHash: password }); 
-        await newUser.save();
-        res.status(201).json({ message: 'Пользователь зарегистрирован!', username: newUser.username });
-    } catch (error) {
-        res.status(400).json({ message: 'Ошибка регистрации.', error: error.message });
-    }
+// Подключение к MongoDB
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/securechat';
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
-// Получение истории чата по ссылке
-app.get('/api/chat/:chatId', async (req, res) => {
-    const { chatId } = req.params;
-    try {
-        // Здесь будет поиск чата в БД и получение данных
-        const chatData = {
-            id: chatId,
-            randomName: `Пользователь_${Math.floor(Math.random() * 1000)}`, // Рандомное имя!
-            participants: ['userA', 'userB'],
-            lastMessage: "Привет! Начнем чат.",
-        };
-        res.status(200).json(chatData);
-    } catch (error) {
-        res.status(404).json({ message: 'Чат не найден.' });
-    }
+// Модели
+const roomSchema = new mongoose.Schema({
+  roomId: { type: String, unique: true, required: true },
+  participants: [
+    {
+      socketId: String,
+      publicKey: String,
+      name: String,
+      joinedAt: { type: Date, default: Date.now },
+    },
+  ],
+  createdAt: { type: Date, default: Date.now },
 });
+const Room = mongoose.model('Room', roomSchema);
 
-// Отправка сообщения (с шифрованием)
-app.post('/api/messages', async (req, res) => {
-    const { chatId, senderId, text, mediaFile } = req.body;
-
-    try {
-        // 1. ШИФРОВАНИЕ ТЕКСТА
-        const encryptedPayload = encryptMessage(text);
-
-        let mediaUrl = null;
-        if (mediaFile) {
-            // В реальном проекте здесь будет логика загрузки файла на S3/Storage
-            mediaUrl = `/uploads/${Date.now()}-${mediaFile.originalname}`; 
-        }
-
-        const newMessage = new Message({
-            chatId,
-            senderId,
-            text: encryptedPayload.encryptedText, // Сохраняем зашифрованный текст
-            mediaUrl: mediaUrl
-        });
-
-        await newMessage.save();
-
-        res.status(201).json({ 
-            messageId: newMessage._id,
-            text: "Сообщение успешно сохранено (зашифровано)"
-        });
-
-    } catch (error) {
-        console.error('Ошибка при сохранении сообщения:', error);
-        res.status(500).json({ message: 'Ошибка сервера при сохранении.' });
-    }
+const messageSchema = new mongoose.Schema({
+  roomId: String,
+  senderId: String, // socket.id
+  senderName: String,
+  encryptedMessage: String, // зашифрованный текст или аудио
+  type: { type: String, default: 'text' }, // 'text' или 'audio'
+  createdAt: { type: Date, default: Date.now },
 });
+const Message = mongoose.model('Message', messageSchema);
 
+// Хранилище комнат в памяти для участников
+const rooms = new Map();
 
-// --- 5. СОБЫТИЯ SOCKET.IO (Сигнализация WebRTC) ---
 io.on('connection', (socket) => {
-    console.log(`[Socket] Пользователь подключен: ${socket.id}`);
+  console.log('New client connected:', socket.id);
 
-    // Событие для отправки сообщения
-    socket.on('send_message', async (messageData) => {
-        const { chatId, senderId, text, mediaFile } = messageData;
+  // Присоединение к комнате
+  socket.on('join-room', async ({ roomId, publicKey, name }) => {
+    socket.join(roomId);
+    let room = await Room.findOne({ roomId });
+    if (!room) {
+      room = new Room({ roomId, participants: [] });
+    }
+    // Добавляем участника
+    room.participants.push({ socketId: socket.id, publicKey, name });
+    await room.save();
 
-        try {
-            // 1. ШИФРОВАНИЕ
-            const encryptedPayload = encryptMessage(text);
+    // Сохраняем в памяти
+    if (!rooms.has(roomId)) rooms.set(roomId, new Map());
+    rooms.get(roomId).set(socket.id, { publicKey, name });
 
-            let mediaUrl = null;
-            if (mediaFile) {
-                mediaUrl = `/uploads/${Date.now()}-${mediaFile.originalname}`; 
-            }
+    // Отправляем историю сообщений
+    const messages = await Message.find({ roomId }).sort({ createdAt: 1 });
+    socket.emit('chat-history', messages);
 
-            // 2. СОХРАНЕНИЕ В БД
-            const newMessage = new Message({
-                chatId,
-                senderId,
-                text: encryptedPayload.encryptedText,
-                mediaUrl: mediaUrl
-            });
-            await newMessage.save();
+    // Уведомляем остальных
+    socket.to(roomId).emit('user-joined', {
+      socketId: socket.id,
+      publicKey,
+      name,
+    });
 
-            // 3. ОТПРАВКА СООБЩЕНИЯ ВСЕМ УЧАСТНИКАМ ЧАТА (Real-Time)
-            io.to(chatId).emit('new_message', {
-                sender: senderId,
-                text: mediaUrl ? `[Медиа]: ${mediaFile.originalname}` : "Сообщение получено!",
-                encryptedData: { encryptedText: encryptedPayload.encryptedText, iv: encryptedPayload.iv },
-                mediaUrl: mediaUrl // Отправляем ссылку на медиа
-            });
+    // Отправляем текущий список участников новому пользователю
+    const participantsList = Array.from(rooms.get(roomId).entries()).map(
+      ([id, data]) => ({ socketId: id, ...data })
+    );
+    socket.emit('participants-list', participantsList);
 
-        } catch (error) {
-            console.error("Ошибка при обработке сообщения:", error);
-            socket.emit('message_error', 'Ошибка сервера при отправке.');
+    // Обработка сообщений
+    socket.on('send-message', async ({ roomId, encryptedMessage, type = 'text' }) => {
+      const sender = rooms.get(roomId)?.get(socket.id);
+      if (!sender) return;
+      const message = new Message({
+        roomId,
+        senderId: socket.id,
+        senderName: sender.name,
+        encryptedMessage,
+        type,
+      });
+      await message.save();
+      // Рассылаем всем в комнате (включая отправителя, чтобы синхронизировать)
+      io.to(roomId).emit('new-message', {
+        _id: message._id,
+        senderId: socket.id,
+        senderName: sender.name,
+        encryptedMessage,
+        type,
+        createdAt: message.createdAt,
+      });
+    });
+
+    // Сигналинг WebRTC
+    socket.on('webrtc-signal', ({ roomId, signal, targetSocketId }) => {
+      io.to(targetSocketId).emit('webrtc-signal', {
+        signal,
+        from: socket.id,
+        fromName: rooms.get(roomId)?.get(socket.id)?.name || 'Unknown',
+      });
+    });
+
+    // Отключение
+    socket.on('disconnect', async () => {
+      console.log('Client disconnected:', socket.id);
+      // Удаляем из комнат
+      for (const [roomId, participants] of rooms.entries()) {
+        if (participants.has(socket.id)) {
+          participants.delete(socket.id);
+          socket.to(roomId).emit('user-left', socket.id);
+          // Обновляем в БД
+          await Room.updateOne(
+            { roomId },
+            { $pull: { participants: { socketId: socket.id } } }
+          );
+          if (participants.size === 0) {
+            rooms.delete(roomId);
+          }
+          break;
         }
+      }
     });
-
-
-    // --- WebRTC Сигнализация ---
-    socket.on('call_request', (data) => {
-        console.log(`[CALL] ${socket.id} запросил звонок к ${data.targetId}`);
-        io.to(data.targetId).emit('incoming_call', { callerId: socket.id });
-    });
-
-    socket.on('webrtc_signal', (signalData) => {
-        // Пересылаем SDP/ICE от одного участника к другому
-        io.to(signalData.targetId).emit('webrtc_signal', { 
-            senderId: socket.id, 
-            signal: signalData.signalData 
-        });
-    });
-
-    socket.on('webrtc_answer', (data) => {
-        // Подтверждение от получателя
-        io.to(data.callerId).emit('webrtc_call_accepted', { status: 'accepted' });
-    });
-
-
-    socket.on('disconnect', () => {
-        console.log(`[Socket] Пользователь отключен: ${socket.id}`);
-    });
+  });
 });
 
-
-// --- 6. ЗАПУСК СЕРВЕРА ---
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Backend Server запущен на порту ${PORT}`));
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
