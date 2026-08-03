@@ -285,7 +285,6 @@
     <div class="call-info" id="callInfo">Звонок...</div>
     <video id="remoteVideo" autoplay playsinline style="width:90%; height:auto; max-height:60vh;"></video>
     <video id="localVideo" autoplay playsinline muted style="width:110px; position:absolute; bottom:90px; right:20px; border-radius:10px; background:#1e293b;"></video>
-    <!-- Отдельный элементы audio для безупречного воспроизведения звука -->
     <audio id="remoteAudio" autoplay></audio>
     <div id="call-controls">
       <button id="hangupBtn">📴</button>
@@ -296,7 +295,7 @@
 <script>
 window.global = window;
 
-// ============================ НАСТРОЙКА FIREBASE ============================
+// ============================ FIREBASE CONFIG ============================
 const firebaseConfig = {
   apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
   authDomain: "chatt-6d410.firebaseapp.com",
@@ -312,7 +311,7 @@ if (!firebase.apps.length) {
 }
 const db = firebase.firestore();
 
-// ============================ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============================
+// ============================ ВАРЫ И СОСТОЯНИЯ ============================
 let roomId = '';
 let myName = '';
 let myKeyPair = null;
@@ -322,7 +321,6 @@ let localPlainMessages = {};
 let peer = null;
 let localStream = null;
 let isCallActive = false;
-let callType = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
@@ -360,7 +358,7 @@ const remoteAudio = document.getElementById('remoteAudio');
 const hangupBtn = document.getElementById('hangupBtn');
 const callInfo = document.getElementById('callInfo');
 
-// ============================ ТЕМА (DARK / LIGHT) ============================
+// ============================ ТЕМА ============================
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   themeToggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
@@ -372,7 +370,7 @@ themeToggleBtn.addEventListener('click', () => {
 });
 setTheme(localStorage.getItem('theme') || 'light');
 
-// ============================ СМАЙЛИКИ ============================
+// ============================ ЭМОДЗИ ============================
 emojiBtn.addEventListener('click', () => {
   emojiPicker.style.display = emojiPicker.style.display === 'flex' ? 'none' : 'flex';
 });
@@ -383,7 +381,7 @@ emojiPicker.addEventListener('click', (e) => {
   }
 });
 
-// ============================ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============================
+// ============================ ХЕЛПЕРЫ ============================
 function generateRandomName() {
   const adjs = ['Быстрый', 'Смелый', 'Тихий', 'Умный', 'Добрый', 'Сильный', 'Весёлый', 'Спокойный'];
   const nouns = ['Лис', 'Волк', 'Медведь', 'Заяц', 'Сокол', 'Дельфин', 'Тигр', 'Панда'];
@@ -479,7 +477,7 @@ async function enterRoom(roomIdParam) {
       if (change.type === 'added') {
         const data = change.doc.data();
         change.doc.ref.delete();
-        handleSignal(data.signal, data.from, data.fromName);
+        handleSignal(data);
       }
     });
   });
@@ -488,18 +486,17 @@ async function enterRoom(roomIdParam) {
   chat.style.display = 'flex';
   msgInput.focus();
 
-  // Маршрутизация через Хэш для идеальной работы с GitHub Pages
+  // Использование хэша делает ссылку 100% совместимой с GitHub Pages без Ошибок 404
   window.location.hash = roomId;
 }
 
-// Скопировать безопасную ссылку (#hash)
 copyLinkBtn.addEventListener('click', () => {
   const shareUrl = `${window.location.origin}${window.location.pathname}#${roomId}`;
   navigator.clipboard.writeText(shareUrl);
-  alert('Ссылка скопирована! По ней можно перейти напрямую без ошибки 404.');
+  alert('Ссылка скопирована!');
 });
 
-// ============================ ОТОБРАЖЕНИЕ СООБЩЕНИЙ ============================
+// ============================ СООБЩЕНИЯ ============================
 function renderMessages() {
   messagesDiv.innerHTML = '';
   messages.forEach(msg => {
@@ -557,7 +554,6 @@ function renderMessages() {
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// ============================ ОТПРАВКА СООБЩЕНИЙ ============================
 async function sendTextMessage(text) {
   if (!text.trim() || !roomId) return;
   const recipientId = Object.keys(participants).find(id => id !== myUserId);
@@ -606,7 +602,6 @@ async function sendAudioMessage(base64Audio) {
   localPlainMessages[docRef.id] = base64Audio;
 }
 
-// ============================ ЗАПИСЬ АУДИО И ИВЕНТЫ ============================
 recordBtn.addEventListener('click', async () => {
   if (isRecording) {
     if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
@@ -647,12 +642,9 @@ joinRoomBtn.addEventListener('click', () => {
   if (id) enterRoom(id);
 });
 
-// Проверка ссылки при загрузке
 window.addEventListener('load', () => {
   const hashRoom = window.location.hash.replace('#', '').trim();
-  if (hashRoom) {
-    enterRoom(hashRoom);
-  }
+  if (hashRoom) enterRoom(hashRoom);
 });
 
 leaveRoomBtn.addEventListener('click', () => {
@@ -672,12 +664,16 @@ leaveRoomBtn.addEventListener('click', () => {
   hangupCall();
 });
 
-// ============================ WEBRTC ЗВОНКИ (УМНЫЙ ДОСТУП) ============================
-function handleSignal(signal, from, fromName) {
+// ============================ WEBRTC ЗВОНКИ (ИСПРАВЛЕНО!) ============================
+function handleSignal(data) {
+  const { signal, from, fromName, callType } = data;
+
   if (!isCallActive && !peer) {
-    if (confirm(`Входящий звонок от ${fromName || 'собеседника'}. Принять?`)) {
-      callType = 'video'; // Пробуем принять звонок
-      startPeer(false, from, signal);
+    const isVideoCall = (callType === 'video');
+    const callKindText = isVideoCall ? 'Видеозвонок' : 'Аудиозвонок';
+
+    if (confirm(`Входящий ${callKindText} от ${fromName || 'собеседника'}. Принять?`)) {
+      startPeer(false, from, isVideoCall, signal);
     }
   } else if (peer && isCallActive) {
     peer.signal(signal);
@@ -685,19 +681,17 @@ function handleSignal(signal, from, fromName) {
 }
 
 async function getUserMediaSmart(wantVideo) {
-  // Пытаемся сначала получить и аудио и видео (если запрошено)
   if (wantVideo) {
     try {
       return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
     } catch (e) {
-      console.warn("Видеокамера недоступна или отсутствует, подключаемся только с микрофоном:", e);
+      console.warn("Видеокамера недоступна, подключаемся в режиме аудио:", e);
     }
   }
-  // Если видео не нужно или камера отсутствует/заблокирована — берем только микрофон
   return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 }
 
-async function startPeer(isInitiator, targetUserId, incomingSignal = null) {
+async function startPeer(isInitiator, targetUserId, wantVideo, incomingSignal = null) {
   const target = participants[targetUserId];
   if (!target) {
     alert('Собеседник не найден');
@@ -705,7 +699,7 @@ async function startPeer(isInitiator, targetUserId, incomingSignal = null) {
   }
 
   try {
-    const stream = await getUserMediaSmart(callType === 'video');
+    const stream = await getUserMediaSmart(wantVideo);
     localStream = stream;
     localVideo.srcObject = stream;
 
@@ -728,25 +722,28 @@ async function startPeer(isInitiator, targetUserId, incomingSignal = null) {
         from: myUserId,
         fromName: myName,
         target: targetUserId,
+        callType: wantVideo ? 'video' : 'audio',
         signal: signal,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     });
 
     peer.on('stream', rStream => {
-      // Привязываем поток к видео и отдельному аудио-тегу для надежности
       remoteVideo.srcObject = rStream;
       remoteAudio.srcObject = rStream;
       
-      remoteVideo.play().catch(e => console.log('Video autoplay error:', e));
-      remoteAudio.play().catch(e => console.log('Audio autoplay error:', e));
+      // Снимаем блокировку Autoplay
+      const playPromise = remoteVideo.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => remoteAudio.play().catch(e => console.log('Audio play err:', e)));
+      }
     });
 
     peer.on('error', err => {
       console.error('Peer error:', err);
       hangupCall();
     });
-    
+
     peer.on('close', () => hangupCall());
 
     if (incomingSignal) peer.signal(incomingSignal);
@@ -756,7 +753,7 @@ async function startPeer(isInitiator, targetUserId, incomingSignal = null) {
     callInfo.textContent = isInitiator ? `Звонок ${target.name}...` : `Разговор с ${target.name}`;
 
   } catch (err) {
-    alert('Ошибка доступа к микрофону: ' + err.message);
+    alert('Ошибка доступа к медиаустройствам: ' + err.message);
     hangupCall();
   }
 }
@@ -769,23 +766,20 @@ function hangupCall() {
   localVideo.srcObject = null;
   callContainer.style.display = 'none';
   isCallActive = false;
-  callType = null;
 }
 
 audioCallBtn.addEventListener('click', () => {
   if (isCallActive) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
   if (!targetId) return alert('Нет собеседника в комнате!');
-  callType = 'audio';
-  startPeer(true, targetId);
+  startPeer(true, targetId, false);
 });
 
 videoCallBtn.addEventListener('click', () => {
   if (isCallActive) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
   if (!targetId) return alert('Нет собеседника в комнате!');
-  callType = 'video';
-  startPeer(true, targetId);
+  startPeer(true, targetId, true);
 });
 
 hangupBtn.addEventListener('click', hangupCall);
