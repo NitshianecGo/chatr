@@ -153,6 +153,16 @@
     .msg-time { font-size: 0.6rem; opacity: 0.7; margin-top: 2px; text-align: right; }
     .msg-audio audio { max-width: 180px; height: 32px; }
 
+    /* Круглые видеосообщения */
+    .msg-video-note video {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #000;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+
     #emoji-picker {
       display: none;
       padding: 8px;
@@ -198,6 +208,9 @@
       padding: 6px;
       border-radius: 50%;
       color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     #sendBtn {
       background: var(--primary);
@@ -211,6 +224,26 @@
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    /* Модалка превью видеокружка во время записи */
+    #video-note-preview-modal {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 20;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #video-note-preview {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid var(--primary);
+      margin-bottom: 15px;
     }
 
     #call-container {
@@ -276,9 +309,17 @@
     <div id="input-area">
       <button class="icon-btn" id="emojiBtn" title="Смайлики">😀</button>
       <button class="icon-btn" id="recordBtn" title="Голосовое сообщение">🎤</button>
+      <button class="icon-btn" id="videoNoteBtn" title="Видеосообщение (кружок)">📹</button>
       <input id="msgInput" placeholder="Сообщение..." autocomplete="off">
       <button id="sendBtn">➤</button>
     </div>
+  </div>
+
+  <!-- Модальное окно записи видеокружка -->
+  <div id="video-note-preview-modal">
+    <video id="video-note-preview" autoplay playsinline muted></video>
+    <div id="videoNoteTimer" style="color:white; font-size:1.2rem; margin-bottom:15px; font-weight:600;">00:60</div>
+    <button class="btn" id="stopVideoNoteBtn" style="background:#ef4444;">⏹ Отправить кружок</button>
   </div>
 
   <div id="call-container">
@@ -321,9 +362,20 @@ let localPlainMessages = {};
 let peer = null;
 let localStream = null;
 let isCallActive = false;
+
+// Запись аудио
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
+
+// Запись видеокружков
+let videoNoteRecorder = null;
+let videoNoteChunks = [];
+let isRecordingVideoNote = false;
+let videoNoteStream = null;
+let videoNoteTimerInterval = null;
+let videoNoteSecondsLeft = 60;
+
 let myUserId = '';          
 let roomRef = null;         
 let messagesRef = null;     
@@ -347,6 +399,7 @@ const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 const audioCallBtn = document.getElementById('audioCallBtn');
 const videoCallBtn = document.getElementById('videoCallBtn');
 const recordBtn = document.getElementById('recordBtn');
+const videoNoteBtn = document.getElementById('videoNoteBtn');
 const emojiBtn = document.getElementById('emojiBtn');
 const emojiPicker = document.getElementById('emoji-picker');
 const themeToggleBtn = document.getElementById('themeToggleBtn');
@@ -357,6 +410,11 @@ const localVideo = document.getElementById('localVideo');
 const remoteAudio = document.getElementById('remoteAudio');
 const hangupBtn = document.getElementById('hangupBtn');
 const callInfo = document.getElementById('callInfo');
+
+const videoNoteModal = document.getElementById('video-note-preview-modal');
+const videoNotePreview = document.getElementById('video-note-preview');
+const videoNoteTimer = document.getElementById('videoNoteTimer');
+const stopVideoNoteBtn = document.getElementById('stopVideoNoteBtn');
 
 // ============================ ТЕМА ============================
 function setTheme(theme) {
@@ -486,7 +544,6 @@ async function enterRoom(roomIdParam) {
   chat.style.display = 'flex';
   msgInput.focus();
 
-  // Использование хэша делает ссылку 100% совместимой с GitHub Pages без Ошибок 404
   window.location.hash = roomId;
 }
 
@@ -538,6 +595,19 @@ function renderMessages() {
         audioContainer.textContent = '🔒 Зашифрованное аудио';
       }
       div.appendChild(audioContainer);
+    } else if (msg.type === 'videoNote') {
+      const videoContainer = document.createElement('div');
+      videoContainer.className = 'msg-video-note';
+      if (decryptedText) {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.playsInline = true;
+        video.src = decryptedText.startsWith('data:') ? decryptedText : `data:video/webm;base64,${decryptedText}`;
+        videoContainer.appendChild(video);
+      } else {
+        videoContainer.textContent = '🔒 Зашифрованное видеосообщение';
+      }
+      div.appendChild(videoContainer);
     } else {
       const textSpan = document.createElement('div');
       textSpan.textContent = decryptedText || '🔒 Не удалось расшифровать';
@@ -580,7 +650,7 @@ async function sendTextMessage(text) {
   msgInput.focus();
 }
 
-async function sendAudioMessage(base64Audio) {
+async function sendMediaMessage(base64Data, type) {
   if (!roomId) return;
   const recipientId = Object.keys(participants).find(id => id !== myUserId);
   if (!recipientId) {
@@ -590,18 +660,19 @@ async function sendAudioMessage(base64Audio) {
   const recipientPublicKey = participants[recipientId]?.publicKey;
   if (!recipientPublicKey) return;
 
-  const encrypted = encryptMessage(base64Audio, recipientPublicKey, myKeyPair.secretKey);
+  const encrypted = encryptMessage(base64Data, recipientPublicKey, myKeyPair.secretKey);
   const docRef = await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
     encryptedMessage: JSON.stringify(encrypted),
-    type: 'audio',
+    type: type,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  localPlainMessages[docRef.id] = base64Audio;
+  localPlainMessages[docRef.id] = base64Data;
 }
 
+// Запись голосового сообщения
 recordBtn.addEventListener('click', async () => {
   if (isRecording) {
     if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
@@ -617,7 +688,7 @@ recordBtn.addEventListener('click', async () => {
     mediaRecorder.onstop = () => {
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
       const reader = new FileReader();
-      reader.onload = () => sendAudioMessage(reader.result);
+      reader.onload = () => sendMediaMessage(reader.result, 'audio');
       reader.readAsDataURL(blob);
       stream.getTracks().forEach(track => track.stop());
     };
@@ -628,6 +699,72 @@ recordBtn.addEventListener('click', async () => {
     alert('Нет доступа к микрофону');
   }
 });
+
+// ============================ ВИДЕО КРУЖОЧКИ (TELEGRAM STYLE) ============================
+async function startVideoNoteRecording() {
+  try {
+    videoNoteStream = await navigator.mediaDevices.getUserMedia({ 
+      audio: true, 
+      video: { width: 360, height: 360, facingMode: 'user' } 
+    });
+
+    videoNotePreview.srcObject = videoNoteStream;
+    videoNoteModal.style.display = 'flex';
+
+    videoNoteRecorder = new MediaRecorder(videoNoteStream, { mimeType: 'video/webm' });
+    videoNoteChunks = [];
+
+    videoNoteRecorder.ondataavailable = event => {
+      if (event.data.size > 0) videoNoteChunks.push(event.data);
+    };
+
+    videoNoteRecorder.onstop = () => {
+      const blob = new Blob(videoNoteChunks, { type: 'video/webm' });
+      const reader = new FileReader();
+      reader.onload = () => sendMediaMessage(reader.result, 'videoNote');
+      reader.readAsDataURL(blob);
+
+      if (videoNoteStream) {
+        videoNoteStream.getTracks().forEach(track => track.stop());
+      }
+      videoNoteModal.style.display = 'none';
+      clearInterval(videoNoteTimerInterval);
+      isRecordingVideoNote = false;
+    };
+
+    videoNoteRecorder.start();
+    isRecordingVideoNote = true;
+    videoNoteSecondsLeft = 60;
+    videoNoteTimer.textContent = `00:60`;
+
+    videoNoteTimerInterval = setInterval(() => {
+      videoNoteSecondsLeft--;
+      const secFormatted = videoNoteSecondsLeft < 10 ? `0${videoNoteSecondsLeft}` : videoNoteSecondsLeft;
+      videoNoteTimer.textContent = `00:${secFormatted}`;
+
+      if (videoNoteSecondsLeft <= 0) {
+        stopVideoNoteRecording();
+      }
+    }, 1000);
+
+  } catch (e) {
+    alert('Не удалось получить доступ к видеокамере или микрофону');
+  }
+}
+
+function stopVideoNoteRecording() {
+  if (videoNoteRecorder && videoNoteRecorder.state === 'recording') {
+    videoNoteRecorder.stop();
+  }
+}
+
+videoNoteBtn.addEventListener('click', () => {
+  const recipientId = Object.keys(participants).find(id => id !== myUserId);
+  if (!recipientId) return alert('Ожидайте подключения второй стороны!');
+  startVideoNoteRecording();
+});
+
+stopVideoNoteBtn.addEventListener('click', stopVideoNoteRecording);
 
 sendBtn.addEventListener('click', () => sendTextMessage(msgInput.value));
 msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendTextMessage(msgInput.value); });
@@ -664,7 +801,7 @@ leaveRoomBtn.addEventListener('click', () => {
   hangupCall();
 });
 
-// ============================ WEBRTC ЗВОНКИ (ИСПРАВЛЕНО!) ============================
+// ============================ WEBRTC ЗВОНКИ ============================
 function handleSignal(data) {
   const { signal, from, fromName, callType } = data;
 
@@ -732,7 +869,6 @@ async function startPeer(isInitiator, targetUserId, wantVideo, incomingSignal = 
       remoteVideo.srcObject = rStream;
       remoteAudio.srcObject = rStream;
       
-      // Снимаем блокировку Autoplay
       const playPromise = remoteVideo.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => remoteAudio.play().catch(e => console.log('Audio play err:', e)));
