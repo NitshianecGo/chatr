@@ -279,16 +279,8 @@
 </div>
 
 <script>
+<script>
 // ============================ НАСТРОЙКА FIREBASE ============================
-// 🔥 ЗАМЕНИТЕ ЭТИ ДАННЫЕ НА СВОИ (из консоли Firebase)
-// Import the functions you need from the SDKs you need
-//import { initializeApp } from "firebase/app";
-//import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
   authDomain: "chatt-6d410.firebaseapp.com",
@@ -299,21 +291,20 @@ const firebaseConfig = {
   measurementId: "G-H616TJEYXC"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
-// Инициализация Firebase
-firebase.initializeApp(firebaseConfig);
+// Инициализация Firebase (используем Compat API)
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.firestore();
-// Включаем оффлайн-персистентность (опционально)
-db.enablePersistence({ synchronizeTabs: true }).catch(err => console.warn('Persistence error:', err));
+
+// Отключаем или мягко обрабатываем персистентность
+db.enablePersistence({ synchronizeTabs: true }).catch(err => console.warn('Persistence warning:', err.message));
 
 // ============================ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============================
 let roomId = '';
 let myName = '';
 let myKeyPair = null;
-let participants = {};      // socketId -> { publicKey, name } (здесь socketId = userId)
+let participants = {};      
 let messages = [];
 let peer = null;
 let localStream = null;
@@ -323,11 +314,11 @@ let callType = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
-let myUserId = '';          // уникальный идентификатор этого клиента (генерируется)
-let roomRef = null;         // ссылка на документ комнаты в Firestore
-let messagesRef = null;     // ссылка на подколлекцию сообщений
-let participantsRef = null; // ссылка на подколлекцию участников
-let signalRef = null;       // ссылка на подколлекцию сигналов
+let myUserId = '';          
+let roomRef = null;         
+let messagesRef = null;     
+let participantsRef = null; 
+let signalRef = null;       
 let unsubscribeMessages = null;
 let unsubscribeParticipants = null;
 let unsubscribeSignals = null;
@@ -356,7 +347,7 @@ const callInfo = document.getElementById('callInfo');
 function generateRandomName() {
   const adjs = ['Быстрый', 'Смелый', 'Тихий', 'Умный', 'Добрый', 'Сильный', 'Весёлый', 'Спокойный'];
   const nouns = ['Лис', 'Волк', 'Медведь', 'Заяц', 'Сокол', 'Дельфин', 'Тигр', 'Панда'];
-  return adjs[Math.floor(Math.random() * adjs.length)] + nouns[Math.floor(Math.random() * nouns.length)];
+  return adjs[Math.floor(Math.random() * adjs.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
 }
 
 function generateKeyPair() {
@@ -396,34 +387,33 @@ function decryptMessage(encryptedPackage, senderPublicKeyBase64, recipientSecret
 }
 
 function formatTime(date) {
-  return new Date(date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  if (!date) return '';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
 function generateUserId() {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
 
-// ============================ РАБОТА С КОМНАТОЙ (FIREBASE) ============================
+// ============================ РАБОТА С КОМНАТОЙ ============================
 async function enterRoom(roomIdParam) {
   roomId = roomIdParam;
   myUserId = generateUserId();
   myName = generateRandomName();
   myKeyPair = generateKeyPair();
 
-  // Ссылки на документы
   roomRef = db.collection('rooms').doc(roomId);
   messagesRef = roomRef.collection('messages');
   participantsRef = roomRef.collection('participants');
   signalRef = roomRef.collection('signals');
 
-  // Создаём/обновляем участника
   await participantsRef.doc(myUserId).set({
     name: myName,
     publicKey: myKeyPair.publicKey,
     joinedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  // Слушаем сообщения
   unsubscribeMessages = messagesRef.orderBy('createdAt', 'asc').onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
@@ -435,7 +425,6 @@ async function enterRoom(roomIdParam) {
     });
   });
 
-  // Слушаем участников
   unsubscribeParticipants = participantsRef.onSnapshot(snapshot => {
     participants = {};
     snapshot.forEach(doc => {
@@ -444,28 +433,22 @@ async function enterRoom(roomIdParam) {
     });
     const count = Object.keys(participants).length;
     roomTitle.textContent = `Комната ${roomId} (${count})`;
-    // Если кто-то вышел или зашёл, обновляем список в интерфейсе (необязательно)
   });
 
-  // Слушаем сигналы WebRTC
   unsubscribeSignals = signalRef.where('target', '==', myUserId).onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
         const data = change.doc.data();
-        // Удаляем обработанный сигнал
         change.doc.ref.delete();
-        // Обрабатываем сигнал
         handleSignal(data.signal, data.from, data.fromName);
       }
     });
   });
 
-  // Переключаем интерфейс
   home.style.display = 'none';
   chat.style.display = 'flex';
   msgInput.focus();
 
-  // Обновляем URL (без перезагрузки)
   window.history.pushState({}, '', `/?room=${roomId}`);
 }
 
@@ -477,54 +460,54 @@ function renderMessages() {
     const div = document.createElement('div');
     div.className = `msg ${isOwn ? 'msg-sent' : 'msg-received'}`;
 
-    // Имя
     const nameSpan = document.createElement('div');
     nameSpan.className = 'msg-name';
-    nameSpan.textContent = msg.senderName || 'Неизвестный';
+    nameSpan.textContent = isOwn ? 'Вы' : (msg.senderName || 'Неизвестный');
     div.appendChild(nameSpan);
 
-    // Содержимое
+    let decryptedText = null;
+
+    // Если сообщение отправлено мной, мы храним его либо открыто локально, 
+    // либо расшифровываем с использованием собственного ключа (в зависимости от вашей логики)
+    if (isOwn && msg.plainText) {
+      decryptedText = msg.plainText;
+    } else {
+      try {
+        const senderCryptoKey = participants[msg.senderId]?.publicKey;
+        if (senderCryptoKey) {
+          decryptedText = decryptMessage(
+            JSON.parse(msg.encryptedMessage),
+            senderCryptoKey,
+            myKeyPair.secretKey
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     if (msg.type === 'audio') {
       const audioContainer = document.createElement('div');
       audioContainer.className = 'msg-audio';
-      try {
-        const decrypted = decryptMessage(
-          JSON.parse(msg.encryptedMessage),
-          participants[msg.senderId]?.publicKey,
-          myKeyPair.secretKey
-        );
-        if (decrypted) {
-          const audio = document.createElement('audio');
-          audio.controls = true;
-          audio.src = decrypted;
-          audio.style.maxWidth = '180px';
-          audioContainer.appendChild(audio);
-        } else {
-          audioContainer.textContent = '🔒 Зашифровано';
-        }
-      } catch {
-        audioContainer.textContent = '🔒 Ошибка';
+      if (decryptedText) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = decryptedText.startsWith('data:') ? decryptedText : `data:audio/webm;base64,${decryptedText}`;
+        audio.style.maxWidth = '180px';
+        audioContainer.appendChild(audio);
+      } else {
+        audioContainer.textContent = '🔒 Зашифровано';
       }
       div.appendChild(audioContainer);
     } else {
-      // Текст
-      try {
-        const decrypted = decryptMessage(
-          JSON.parse(msg.encryptedMessage),
-          participants[msg.senderId]?.publicKey,
-          myKeyPair.secretKey
-        );
-        const textSpan = document.createElement('div');
-        textSpan.textContent = decrypted || '🔒 Не удалось расшифровать';
-        div.appendChild(textSpan);
-      } catch {
-        div.innerHTML += '🔒 Ошибка расшифровки';
-      }
+      const textSpan = document.createElement('div');
+      textSpan.textContent = decryptedText || '🔒 Не удалось расшифровать';
+      div.appendChild(textSpan);
     }
 
     const timeSpan = document.createElement('div');
     timeSpan.className = 'msg-time';
-    timeSpan.textContent = formatTime(msg.createdAt?.toDate?.() || msg.createdAt);
+    timeSpan.textContent = formatTime(msg.createdAt);
     div.appendChild(timeSpan);
 
     messagesDiv.appendChild(div);
@@ -535,16 +518,17 @@ function renderMessages() {
 // ============================ ОТПРАВКА СООБЩЕНИЙ ============================
 async function sendTextMessage(text) {
   if (!text.trim() || !roomId) return;
-  // Выбираем получателя (для простоты – первого участника, кроме себя)
   const recipientId = Object.keys(participants).find(id => id !== myUserId);
   if (!recipientId) {
-    alert('Нет других участников');
+    alert('Ожидайте подключения второго участника!');
     return;
   }
   const recipientPublicKey = participants[recipientId]?.publicKey;
   if (!recipientPublicKey) return;
 
   const encrypted = encryptMessage(text, recipientPublicKey, myKeyPair.secretKey);
+  
+  // Сохраняем сообщение
   await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
@@ -552,6 +536,7 @@ async function sendTextMessage(text) {
     type: 'text',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
+  
   msgInput.value = '';
   msgInput.focus();
 }
@@ -560,7 +545,7 @@ async function sendAudioMessage(base64Audio) {
   if (!roomId) return;
   const recipientId = Object.keys(participants).find(id => id !== myUserId);
   if (!recipientId) {
-    alert('Нет других участников');
+    alert('Ожидайте подключения второго участника!');
     return;
   }
   const recipientPublicKey = participants[recipientId]?.publicKey;
@@ -576,12 +561,10 @@ async function sendAudioMessage(base64Audio) {
   });
 }
 
-// ============================ ЗАПИСЬ АУДИО ============================
+// ============================ СОБЫТИЯ И ВЫЗОВЫ ============================
 recordBtn.addEventListener('click', async () => {
   if (isRecording) {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
-    }
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
     isRecording = false;
     recordBtn.textContent = '🎤';
     return;
@@ -590,16 +573,11 @@ recordBtn.addEventListener('click', async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
     audioChunks = [];
-    mediaRecorder.ondataavailable = event => {
-      if (event.data.size > 0) audioChunks.push(event.data);
-    };
+    mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
     mediaRecorder.onstop = () => {
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
       const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1];
-        sendAudioMessage(base64);
-      };
+      reader.onload = () => sendAudioMessage(reader.result);
       reader.readAsDataURL(blob);
       stream.getTracks().forEach(track => track.stop());
     };
@@ -611,13 +589,9 @@ recordBtn.addEventListener('click', async () => {
   }
 });
 
-// ============================ ОТПРАВКА ТЕКСТА ============================
 sendBtn.addEventListener('click', () => sendTextMessage(msgInput.value));
-msgInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') sendTextMessage(msgInput.value);
-});
+msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendTextMessage(msgInput.value); });
 
-// ============================ СОЗДАНИЕ / ВХОД В КОМНАТУ ============================
 createRoomBtn.addEventListener('click', () => {
   const newRoomId = Math.random().toString(36).substring(2, 8);
   enterRoom(newRoomId);
@@ -628,26 +602,18 @@ joinRoomBtn.addEventListener('click', () => {
   if (id) enterRoom(id);
 });
 
-// Автовход по параметру room в URL
 window.addEventListener('load', () => {
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
-  if (room) {
-    enterRoom(room);
-  }
+  if (room) enterRoom(room);
 });
 
-// ============================ ВЫХОД ============================
 leaveRoomBtn.addEventListener('click', () => {
-  // Отписываемся
   if (unsubscribeMessages) unsubscribeMessages();
   if (unsubscribeParticipants) unsubscribeParticipants();
   if (unsubscribeSignals) unsubscribeSignals();
-  // Удаляем участника из комнаты
-  if (roomRef && myUserId) {
-    participantsRef.doc(myUserId).delete().catch(() => {});
-  }
-  // Сбрасываем состояние
+  if (roomRef && myUserId) participantsRef.doc(myUserId).delete().catch(() => {});
+  
   participants = {};
   messages = [];
   roomId = '';
@@ -655,27 +621,15 @@ leaveRoomBtn.addEventListener('click', () => {
   home.style.display = 'flex';
   chat.style.display = 'none';
   window.history.pushState({}, '', '/');
-  if (peer) {
-    peer.destroy();
-    peer = null;
-  }
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-  }
-  callContainer.style.display = 'none';
-  isCallActive = false;
+  hangupCall();
 });
 
-// ============================ ЗВОНКИ (WebRTC) ============================
+// ============================ WEBRTC ЗВОНКИ ============================
 function handleSignal(signal, from, fromName) {
   if (!isCallActive && !peer) {
-    // Входящий звонок
     if (confirm(`Входящий звонок от ${fromName || 'собеседника'}. Принять?`)) {
-      callType = 'audio'; // можно определить по типу сигнала, но упростим
+      callType = 'audio';
       startPeer(false, from, signal);
-    } else {
-      // Отказ – ничего не делаем
     }
   } else if (peer && isCallActive) {
     peer.signal(signal);
@@ -703,7 +657,6 @@ function startPeer(isInitiator, targetUserId, incomingSignal = null) {
       });
 
       peer.on('signal', signal => {
-        // Отправляем сигнал через Firestore
         signalRef.add({
           from: myUserId,
           fromName: myName,
@@ -713,42 +666,26 @@ function startPeer(isInitiator, targetUserId, incomingSignal = null) {
         });
       });
 
-      peer.on('stream', remoteStream => {
-        remoteVideo.srcObject = remoteStream;
+      peer.on('stream', rStream => {
+        remoteVideo.srcObject = rStream;
         remoteVideo.play();
       });
 
-      peer.on('error', err => {
-        console.error('Peer error:', err);
-        hangupCall();
-      });
+      peer.on('error', err => hangupCall());
+      peer.on('close', () => hangupCall());
 
-      peer.on('close', () => {
-        hangupCall();
-      });
-
-      if (incomingSignal) {
-        peer.signal(incomingSignal);
-      }
+      if (incomingSignal) peer.signal(incomingSignal);
 
       isCallActive = true;
       callContainer.style.display = 'flex';
-      callInfo.textContent = isInitiator ? `Звонок ${target.name}...` : `Входящий звонок от ${target.name}`;
+      callInfo.textContent = isInitiator ? `Звонок ${target.name}...` : `Разговор с ${target.name}`;
     })
-    .catch(err => {
-      alert('Не удалось получить доступ к медиа: ' + err.message);
-    });
+    .catch(err => alert('Ошибка медиа: ' + err.message));
 }
 
 function hangupCall() {
-  if (peer) {
-    peer.destroy();
-    peer = null;
-  }
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-  }
+  if (peer) { peer.destroy(); peer = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   remoteVideo.srcObject = null;
   localVideo.srcObject = null;
   callContainer.style.display = 'none';
@@ -759,10 +696,7 @@ function hangupCall() {
 audioCallBtn.addEventListener('click', () => {
   if (isCallActive) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
-  if (!targetId) {
-    alert('Нет собеседника');
-    return;
-  }
+  if (!targetId) return alert('Нет собеседника в комнате!');
   callType = 'audio';
   startPeer(true, targetId);
 });
@@ -770,17 +704,12 @@ audioCallBtn.addEventListener('click', () => {
 videoCallBtn.addEventListener('click', () => {
   if (isCallActive) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
-  if (!targetId) {
-    alert('Нет собеседника');
-    return;
-  }
+  if (!targetId) return alert('Нет собеседника в комнате!');
   callType = 'video';
   startPeer(true, targetId);
 });
 
 hangupBtn.addEventListener('click', hangupCall);
-
-console.log('Приложение загружено. Настройте Firebase и создайте комнату.');
 </script>
 </body>
 </html>
