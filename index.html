@@ -218,7 +218,7 @@
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9);
+      background: rgba(0,0,0,0.95);
       flex-direction: column;
       justify-content: center;
       align-items: center;
@@ -283,8 +283,10 @@
 
   <div id="call-container">
     <div class="call-info" id="callInfo">Звонок...</div>
-    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="remoteVideo" autoplay playsinline style="width:90%; height:auto; max-height:60vh;"></video>
     <video id="localVideo" autoplay playsinline muted style="width:110px; position:absolute; bottom:90px; right:20px; border-radius:10px; background:#1e293b;"></video>
+    <!-- Отдельный элементы audio для безупречного воспроизведения звука -->
+    <audio id="remoteAudio" autoplay></audio>
     <div id="call-controls">
       <button id="hangupBtn">📴</button>
     </div>
@@ -292,7 +294,6 @@
 </div>
 
 <script>
-// Полифил для simple-peer
 window.global = window;
 
 // ============================ НАСТРОЙКА FIREBASE ============================
@@ -355,6 +356,7 @@ const copyLinkBtn = document.getElementById('copyLinkBtn');
 const callContainer = document.getElementById('call-container');
 const remoteVideo = document.getElementById('remoteVideo');
 const localVideo = document.getElementById('localVideo');
+const remoteAudio = document.getElementById('remoteAudio');
 const hangupBtn = document.getElementById('hangupBtn');
 const callInfo = document.getElementById('callInfo');
 
@@ -486,13 +488,15 @@ async function enterRoom(roomIdParam) {
   chat.style.display = 'flex';
   msgInput.focus();
 
-  window.history.pushState({}, '', `/?room=${roomId}`);
+  // Маршрутизация через Хэш для идеальной работы с GitHub Pages
+  window.location.hash = roomId;
 }
 
-// Скопировать ссылку
+// Скопировать безопасную ссылку (#hash)
 copyLinkBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(window.location.href);
-  alert('Ссылка на комнату скопирована в буфер обмена!');
+  const shareUrl = `${window.location.origin}${window.location.pathname}#${roomId}`;
+  navigator.clipboard.writeText(shareUrl);
+  alert('Ссылка скопирована! По ней можно перейти напрямую без ошибки 404.');
 });
 
 // ============================ ОТОБРАЖЕНИЕ СООБЩЕНИЙ ============================
@@ -643,11 +647,12 @@ joinRoomBtn.addEventListener('click', () => {
   if (id) enterRoom(id);
 });
 
-// Автоматический вход при переходе по ссылке
+// Проверка ссылки при загрузке
 window.addEventListener('load', () => {
-  const params = new URLSearchParams(window.location.search);
-  const room = params.get('room');
-  if (room) enterRoom(room);
+  const hashRoom = window.location.hash.replace('#', '').trim();
+  if (hashRoom) {
+    enterRoom(hashRoom);
+  }
 });
 
 leaveRoomBtn.addEventListener('click', () => {
@@ -663,15 +668,15 @@ leaveRoomBtn.addEventListener('click', () => {
   myUserId = '';
   home.style.display = 'flex';
   chat.style.display = 'none';
-  window.history.pushState({}, '', '/');
+  window.location.hash = '';
   hangupCall();
 });
 
-// ============================ WEBRTC ЗВОНКИ ============================
+// ============================ WEBRTC ЗВОНКИ (УМНЫЙ ДОСТУП) ============================
 function handleSignal(signal, from, fromName) {
   if (!isCallActive && !peer) {
     if (confirm(`Входящий звонок от ${fromName || 'собеседника'}. Принять?`)) {
-      callType = 'audio';
+      callType = 'video'; // Пробуем принять звонок
       startPeer(false, from, signal);
     }
   } else if (peer && isCallActive) {
@@ -679,64 +684,88 @@ function handleSignal(signal, from, fromName) {
   }
 }
 
-function startPeer(isInitiator, targetUserId, incomingSignal = null) {
+async function getUserMediaSmart(wantVideo) {
+  // Пытаемся сначала получить и аудио и видео (если запрошено)
+  if (wantVideo) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    } catch (e) {
+      console.warn("Видеокамера недоступна или отсутствует, подключаемся только с микрофоном:", e);
+    }
+  }
+  // Если видео не нужно или камера отсутствует/заблокирована — берем только микрофон
+  return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+}
+
+async function startPeer(isInitiator, targetUserId, incomingSignal = null) {
   const target = participants[targetUserId];
   if (!target) {
     alert('Собеседник не найден');
     return;
   }
 
-  const constraints = { audio: true, video: callType === 'video' };
-  navigator.mediaDevices.getUserMedia(constraints)
-    .then(stream => {
-      localStream = stream;
-      localVideo.srcObject = stream;
+  try {
+    const stream = await getUserMediaSmart(callType === 'video');
+    localStream = stream;
+    localVideo.srcObject = stream;
 
-      peer = new SimplePeer({
-        initiator: isInitiator,
-        trickle: true,
-        stream: stream,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:openrelay.metered.ca:80' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-          ]
-        }
+    peer = new SimplePeer({
+      initiator: isInitiator,
+      trickle: true,
+      stream: stream,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:openrelay.metered.ca:80' },
+          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+        ]
+      }
+    });
+
+    peer.on('signal', signal => {
+      signalRef.add({
+        from: myUserId,
+        fromName: myName,
+        target: targetUserId,
+        signal: signal,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+    });
 
-      peer.on('signal', signal => {
-        signalRef.add({
-          from: myUserId,
-          fromName: myName,
-          target: targetUserId,
-          signal: signal,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      });
+    peer.on('stream', rStream => {
+      // Привязываем поток к видео и отдельному аудио-тегу для надежности
+      remoteVideo.srcObject = rStream;
+      remoteAudio.srcObject = rStream;
+      
+      remoteVideo.play().catch(e => console.log('Video autoplay error:', e));
+      remoteAudio.play().catch(e => console.log('Audio autoplay error:', e));
+    });
 
-      peer.on('stream', rStream => {
-        remoteVideo.srcObject = rStream;
-        remoteVideo.play().catch(e => console.log('Autoplay:', e));
-      });
+    peer.on('error', err => {
+      console.error('Peer error:', err);
+      hangupCall();
+    });
+    
+    peer.on('close', () => hangupCall());
 
-      peer.on('error', err => hangupCall());
-      peer.on('close', () => hangupCall());
+    if (incomingSignal) peer.signal(incomingSignal);
 
-      if (incomingSignal) peer.signal(incomingSignal);
+    isCallActive = true;
+    callContainer.style.display = 'flex';
+    callInfo.textContent = isInitiator ? `Звонок ${target.name}...` : `Разговор с ${target.name}`;
 
-      isCallActive = true;
-      callContainer.style.display = 'flex';
-      callInfo.textContent = isInitiator ? `Звонок ${target.name}...` : `Разговор с ${target.name}`;
-    })
-    .catch(err => alert('Ошибка доступа к медиаустройствам: ' + err.message));
+  } catch (err) {
+    alert('Ошибка доступа к микрофону: ' + err.message);
+    hangupCall();
+  }
 }
 
 function hangupCall() {
   if (peer) { peer.destroy(); peer = null; }
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   remoteVideo.srcObject = null;
+  remoteAudio.srcObject = null;
   localVideo.srcObject = null;
   callContainer.style.display = 'none';
   isCallActive = false;
