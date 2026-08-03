@@ -4,268 +4,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Chat App</title>
-  <!-- Firebase SDK (Compat) -->
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <!-- simple-peer -->
   <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
   <style>
-    :root {
-      --bg-body: #0f172a;
-      --bg-app: #1e293b;
-      --bg-messages: #0f172a;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --border-color: #334155;
-      --primary: #3b82f6;
-      --primary-hover: #60a5fa;
-      --msg-sent: #2563eb;
-      --msg-sent-text: #ffffff;
-      --msg-received: #334155;
-      --msg-received-text: #f8fafc;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: var(--bg-body);
-      color: var(--text-main);
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    #app {
-      width: 100%;
-      max-width: 480px;
-      height: 100vh;
-      max-height: 800px;
-      background: var(--bg-app);
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
-      display: flex;
-      flex-direction: column;
-      border-radius: 20px;
-      overflow: hidden;
-      position: relative;
-    }
-    #home {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      padding: 20px;
-      text-align: center;
-    }
-    #home h1 { font-size: 2rem; margin-bottom: 10px; }
-    #home p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; }
-    
-    .btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 30px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .btn:hover { background: var(--primary-hover); }
-
-    #chat { display: none; flex-direction: column; height: 100%; }
-    #header {
-      padding: 12px 16px;
-      background: var(--bg-app);
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    #header h2 { font-size: 1rem; font-weight: 600; }
-    #header-actions { display: flex; gap: 6px; align-items: center; }
-    #header-actions button {
-      background: none;
-      border: none;
-      font-size: 1.1rem;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 8px;
-      color: var(--text-main);
-    }
-    #header-actions button:hover { background: var(--border-color); }
-
-    #messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      background: var(--bg-messages);
-    }
-    .msg {
-      max-width: 80%;
-      padding: 10px 14px;
-      border-radius: 18px;
-      word-wrap: break-word;
-      font-size: 0.95rem;
-      line-height: 1.4;
-    }
-    .msg-sent {
-      align-self: flex-end;
-      background: var(--msg-sent);
-      color: var(--msg-sent-text);
-      border-bottom-right-radius: 4px;
-    }
-    .msg-received {
-      align-self: flex-start;
-      background: var(--msg-received);
-      color: var(--msg-received-text);
-      border: 1px solid var(--border-color);
-      border-bottom-left-radius: 4px;
-    }
-    .msg-name { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; }
-    .msg-sent .msg-name { color: #bfdbfe; }
-    .msg-time { font-size: 0.65rem; opacity: 0.7; margin-top: 4px; text-align: right; }
-    .msg-audio audio { max-width: 200px; height: 36px; }
-
-    .msg-video-note video {
-      width: 160px;
-      height: 160px;
-      border-radius: 50%;
-      object-fit: cover;
-      background: #000;
-      border: 2px solid var(--primary);
-      display: block;
-    }
-
-    #emoji-picker {
-      display: none;
-      padding: 8px;
-      background: var(--bg-app);
-      border-top: 1px solid var(--border-color);
-      flex-wrap: wrap;
-      gap: 8px;
-      max-height: 110px;
-      overflow-y: auto;
-    }
-    #emoji-picker span { font-size: 1.3rem; cursor: pointer; padding: 4px; }
-
-    #input-area {
-      padding: 10px 12px;
-      background: var(--bg-app);
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    #input-area input {
-      flex: 1;
-      border: 1px solid var(--border-color);
-      background: var(--bg-body);
-      color: var(--text-main);
-      border-radius: 24px;
-      padding: 10px 14px;
-      font-size: 0.95rem;
-      outline: none;
-    }
-    .icon-btn {
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 50%;
-      color: var(--text-main);
-    }
-    #sendBtn {
-      background: var(--primary);
-      border: none;
-      color: white;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.1rem;
-      cursor: pointer;
-    }
-
-    #video-note-preview-modal {
-      display: none;
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9);
-      z-index: 20;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-    #video-note-preview {
-      width: 200px;
-      height: 200px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 4px solid var(--primary);
-      margin-bottom: 15px;
-      background: #000;
-    }
-
-    /* Звонки */
-    #call-container {
-      display: none;
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.95);
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 30;
-    }
-    #call-container video {
-      width: 100%; max-width: 360px;
-      background: #1e293b;
-      border-radius: 12px;
-    }
-    #call-controls button {
-      background: #ef4444; border: none; color: white;
-      border-radius: 50%; width: 56px; height: 56px;
-      font-size: 1.4rem; cursor: pointer; margin-top: 20px;
-    }
-    .call-info { color: white; font-size: 1.1rem; margin-bottom: 15px; font-weight: 600; }
-
-    /* Окно входящего звонка */
-    #incoming-call-modal {
-      display: none;
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85);
-      z-index: 40;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .call-modal-box {
-      background: var(--bg-app);
-      padding: 24px;
-      border-radius: 16px;
-      text-align: center;
-      border: 1px solid var(--border-color);
-    }
-    .call-modal-actions {
-      display: flex;
-      gap: 16px;
-      justify-content: center;
-      margin-top: 20px;
-    }
-    .btn-accept { background: #22c55e; color: white; }
-    .btn-reject { background: #ef4444; color: white; }
+    /* (стили такие же, как у вас, я их не меняю) */
+    :root { --bg-body: #0f172a; --bg-app: #1e293b; --bg-messages: #0f172a; --text-main: #f8fafc; --text-muted: #94a3b8; --border-color: #334155; --primary: #3b82f6; --primary-hover: #60a5fa; --msg-sent: #2563eb; --msg-sent-text: #ffffff; --msg-received: #334155; --msg-received-text: #f8fafc; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg-body); color: var(--text-main); height:100vh; display:flex; justify-content:center; align-items:center; }
+    #app { width:100%; max-width:480px; height:100vh; max-height:800px; background:var(--bg-app); box-shadow:0 0 20px rgba(0,0,0,0.5); display:flex; flex-direction:column; border-radius:20px; overflow:hidden; position:relative; }
+    #home { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding:20px; text-align:center; }
+    #home h1 { font-size:2rem; margin-bottom:10px; }
+    #home p { color:var(--text-muted); margin-bottom:25px; font-size:0.95rem; }
+    .btn { background:var(--primary); color:white; border:none; padding:12px 24px; border-radius:30px; font-size:1rem; font-weight:600; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:8px; }
+    .btn:hover { background:var(--primary-hover); }
+    #chat { display:none; flex-direction:column; height:100%; }
+    #header { padding:12px 16px; background:var(--bg-app); border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+    #header h2 { font-size:1rem; font-weight:600; }
+    #header-actions { display:flex; gap:6px; align-items:center; }
+    #header-actions button { background:none; border:none; font-size:1.1rem; cursor:pointer; padding:6px; border-radius:8px; color:var(--text-main); }
+    #header-actions button:hover { background:var(--border-color); }
+    #messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; background:var(--bg-messages); }
+    .msg { max-width:80%; padding:10px 14px; border-radius:18px; word-wrap:break-word; font-size:0.95rem; line-height:1.4; }
+    .msg-sent { align-self:flex-end; background:var(--msg-sent); color:var(--msg-sent-text); border-bottom-right-radius:4px; }
+    .msg-received { align-self:flex-start; background:var(--msg-received); color:var(--msg-received-text); border:1px solid var(--border-color); border-bottom-left-radius:4px; }
+    .msg-name { font-size:0.7rem; font-weight:600; color:var(--text-muted); margin-bottom:2px; }
+    .msg-sent .msg-name { color:#bfdbfe; }
+    .msg-time { font-size:0.65rem; opacity:0.7; margin-top:4px; text-align:right; }
+    .msg-audio audio { max-width:200px; height:36px; }
+    .msg-video-note video { width:160px; height:160px; border-radius:50%; object-fit:cover; background:#000; border:2px solid var(--primary); display:block; }
+    #emoji-picker { display:none; padding:8px; background:var(--bg-app); border-top:1px solid var(--border-color); flex-wrap:wrap; gap:8px; max-height:110px; overflow-y:auto; }
+    #emoji-picker span { font-size:1.3rem; cursor:pointer; padding:4px; }
+    #input-area { padding:10px 12px; background:var(--bg-app); border-top:1px solid var(--border-color); display:flex; gap:6px; align-items:center; flex-shrink:0; }
+    #input-area input { flex:1; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-main); border-radius:24px; padding:10px 14px; font-size:0.95rem; outline:none; }
+    .icon-btn { background:none; border:none; font-size:1.2rem; cursor:pointer; padding:6px; border-radius:50%; color:var(--text-main); }
+    #sendBtn { background:var(--primary); border:none; color:white; border-radius:50%; width:40px; height:40px; font-size:1.1rem; cursor:pointer; }
+    #video-note-preview-modal { display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:20; flex-direction:column; align-items:center; justify-content:center; }
+    #video-note-preview { width:200px; height:200px; border-radius:50%; object-fit:cover; border:4px solid var(--primary); margin-bottom:15px; background:#000; }
+    #call-container { display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); flex-direction:column; justify-content:center; align-items:center; z-index:30; }
+    #call-container video { width:100%; max-width:360px; background:#1e293b; border-radius:12px; }
+    #call-controls button { background:#ef4444; border:none; color:white; border-radius:50%; width:56px; height:56px; font-size:1.4rem; cursor:pointer; margin-top:20px; }
+    .call-info { color:white; font-size:1.1rem; margin-bottom:15px; font-weight:600; }
+    #incoming-call-modal { display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:40; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+    .call-modal-box { background:var(--bg-app); padding:24px; border-radius:16px; text-align:center; border:1px solid var(--border-color); }
+    .call-modal-actions { display:flex; gap:16px; justify-content:center; margin-top:20px; }
+    .btn-accept { background:#22c55e; color:white; }
+    .btn-reject { background:#ef4444; color:white; }
   </style>
 </head>
 <body>
@@ -380,7 +166,7 @@ let videoNoteStream = null;
 let videoNoteTimerInterval = null;
 let videoNoteSecondsLeft = 15;
 
-// DOM
+// DOM (как в вашем коде)
 const home = document.getElementById('home');
 const chat = document.getElementById('chat');
 const messagesDiv = document.getElementById('messages');
@@ -414,24 +200,20 @@ const videoNotePreview = document.getElementById('video-note-preview');
 const videoNoteTimer = document.getElementById('videoNoteTimer');
 const stopVideoNoteBtn = document.getElementById('stopVideoNoteBtn');
 
-// ============================ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============================
+// ============================ ВСПОМОГАТЕЛЬНЫЕ ============================
 function generateRandomName() {
   const adjs = ['Быстрый', 'Тихий', 'Умный', 'Сильный', 'Весёлый', 'Смелый'];
   const nouns = ['Лис', 'Волк', 'Заяц', 'Сокол', 'Дельфин', 'Тигр'];
   return adjs[Math.floor(Math.random() * adjs.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
 }
-
-function generateUserId() {
-  return 'usr_' + Math.random().toString(36).substring(2, 9);
-}
-
+function generateUserId() { return 'usr_' + Math.random().toString(36).substring(2, 9); }
 function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-// ============================ ВХОД И ВЫХОД ============================
+// ============================ ВХОД / ВЫХОД ============================
 async function enterRoom(roomIdParam) {
   roomId = roomIdParam;
   myUserId = generateUserId();
@@ -449,9 +231,7 @@ async function enterRoom(roomIdParam) {
 
   unsubscribeParticipants = participantsRef.onSnapshot(snapshot => {
     participants = {};
-    snapshot.forEach(doc => {
-      participants[doc.id] = doc.data();
-    });
+    snapshot.forEach(doc => { participants[doc.id] = doc.data(); });
     const count = Object.keys(participants).length;
     roomTitle.textContent = `Комната (${count})`;
   });
@@ -479,49 +259,38 @@ async function enterRoom(roomIdParam) {
   });
 
   window.location.hash = `${roomId}`;
-
   home.style.display = 'none';
   chat.style.display = 'flex';
   msgInput.focus();
 }
 
 window.addEventListener('beforeunload', () => {
-  if (participantsRef && myUserId) {
-    participantsRef.doc(myUserId).delete();
-  }
+  if (participantsRef && myUserId) participantsRef.doc(myUserId).delete();
 });
 
 function leaveRoom() {
-  if (participantsRef && myUserId) {
-    participantsRef.doc(myUserId).delete().catch(() => {});
-  }
+  if (participantsRef && myUserId) participantsRef.doc(myUserId).delete().catch(() => {});
   if (unsubscribeMessages) unsubscribeMessages();
   if (unsubscribeParticipants) unsubscribeParticipants();
   if (unsubscribeSignals) unsubscribeSignals();
-
   processedMsgIds.clear();
   participants = {};
   roomId = '';
   myUserId = '';
-
   hangupCall();
-
   home.style.display = 'flex';
   chat.style.display = 'none';
   window.location.hash = '';
 }
-
 leaveRoomBtn.addEventListener('click', leaveRoom);
-
 createRoomBtn.addEventListener('click', () => {
   const newRoomId = Math.random().toString(36).substring(2, 8);
   enterRoom(newRoomId);
 });
-
 copyLinkBtn.addEventListener('click', () => {
   const fullLink = `${window.location.origin}${window.location.pathname}#${roomId}`;
   navigator.clipboard.writeText(fullLink);
-  alert('Ссылка на комнату скопирована!');
+  alert('Ссылка скопирована!');
 });
 
 // ============================ ОТРИСОВКА СООБЩЕНИЙ ============================
@@ -572,7 +341,6 @@ function renderSingleMessage(id, msg) {
 // ============================ ОТПРАВКА СООБЩЕНИЙ ============================
 async function sendTextMessage(text) {
   if (!text.trim() || !roomId) return;
-
   await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
@@ -580,7 +348,6 @@ async function sendTextMessage(text) {
     type: 'text',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
-
   msgInput.value = '';
   emojiPicker.style.display = 'none';
   msgInput.focus();
@@ -588,7 +355,6 @@ async function sendTextMessage(text) {
 
 async function sendMediaMessage(base64Data, type) {
   if (!roomId) return;
-
   await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
@@ -600,7 +366,6 @@ async function sendMediaMessage(base64Data, type) {
 
 sendBtn.addEventListener('click', () => sendTextMessage(msgInput.value));
 msgInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendTextMessage(msgInput.value); });
-
 emojiBtn.addEventListener('click', () => {
   emojiPicker.style.display = emojiPicker.style.display === 'flex' ? 'none' : 'flex';
 });
@@ -639,10 +404,9 @@ recordBtn.addEventListener('click', async () => {
   }
 });
 
-// ============================ ВИДЕО КРУЖКИ ============================
+// ============================ ВИДЕОКРУЖКИ (исправлено) ============================
 async function startVideoNoteRecording() {
   closeVideoNoteModal();
-
   try {
     videoNoteStream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -656,7 +420,8 @@ async function startVideoNoteRecording() {
   videoNotePreview.srcObject = videoNoteStream;
   videoNoteModal.style.display = 'flex';
 
-  const options = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 250000 };
+  // Убираем привязку к конкретному кодеку – используем 'video/webm' (браузер сам выберет)
+  const options = { mimeType: 'video/webm' };
   try {
     videoNoteRecorder = new MediaRecorder(videoNoteStream, options);
   } catch(e) {
@@ -665,7 +430,6 @@ async function startVideoNoteRecording() {
 
   videoNoteChunks = [];
   videoNoteRecorder.ondataavailable = e => { if (e.data.size > 0) videoNoteChunks.push(e.data); };
-
   videoNoteRecorder.onstop = () => {
     const blob = new Blob(videoNoteChunks, { type: videoNoteRecorder.mimeType || 'video/webm' });
     const reader = new FileReader();
@@ -683,10 +447,7 @@ async function startVideoNoteRecording() {
     videoNoteSecondsLeft--;
     const sec = videoNoteSecondsLeft < 10 ? `0${videoNoteSecondsLeft}` : videoNoteSecondsLeft;
     videoNoteTimer.textContent = `00:${sec}`;
-
-    if (videoNoteSecondsLeft <= 0) {
-      stopVideoNoteRecording();
-    }
+    if (videoNoteSecondsLeft <= 0) stopVideoNoteRecording();
   }, 1000);
 }
 
@@ -710,10 +471,9 @@ function stopVideoNoteRecording() {
 videoNoteBtn.addEventListener('click', startVideoNoteRecording);
 stopVideoNoteBtn.addEventListener('click', stopVideoNoteRecording);
 
-// ============================ WEBRTC ЗВОНКИ ============================
+// ============================ WEBRTC ЗВОНКИ (исправлено) ============================
 function handleIncomingSignal(data) {
   const { signal, from, fromName, callType } = data;
-
   if (!isCallActive && !peer) {
     pendingCallData = data;
     const isVideo = callType === 'video';
@@ -728,6 +488,7 @@ acceptCallBtn.addEventListener('click', () => {
   incomingCallModal.style.display = 'none';
   if (pendingCallData) {
     const { from, callType, signal } = pendingCallData;
+    // Передаём wantVideo и incomingSignal
     startPeerConnection(false, from, callType === 'video', signal);
     pendingCallData = null;
   }
@@ -753,14 +514,17 @@ async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomin
 
   localVideo.srcObject = localStream;
 
+  // ВАЖНО: отключаем trickle, чтобы все кандидаты передавались одним сигналом
   peer = new SimplePeer({
     initiator: isInitiator,
-    trickle: true,
+    trickle: false,            // <-- исправление
     stream: localStream,
     config: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        // Добавим ещё один STUN для надёжности
+        { urls: 'stun:stun.ekiga.net' }
       ]
     }
   });
@@ -783,7 +547,10 @@ async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomin
     remoteAudio.play().catch(() => {});
   });
 
-  peer.on('error', err => console.error('Peer error:', err));
+  peer.on('error', err => {
+    console.error('Peer error:', err);
+    hangupCall();
+  });
   peer.on('close', () => hangupCall());
 
   if (incomingSignal) {
