@@ -93,6 +93,7 @@
       gap: 8px;
     }
     .btn:hover { background: var(--primary-hover); transform: scale(1.02); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-secondary { background: var(--border-color); color: var(--text-main); }
 
     #chat { display: none; flex-direction: column; height: 100%; }
@@ -117,6 +118,7 @@
       color: var(--text-main);
     }
     #header-actions button:hover { background: var(--border-color); }
+    #header-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #messages {
       flex: 1;
@@ -151,12 +153,11 @@
     .msg-name { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; }
     .msg-sent .msg-name { color: #bfdbfe; }
     .msg-time { font-size: 0.6rem; opacity: 0.7; margin-top: 2px; text-align: right; }
-    .msg-audio audio { max-width: 180px; height: 32px; }
+    .msg-audio audio { max-width: 200px; height: 36px; }
 
-    /* Круглые видеосообщения */
     .msg-video-note video {
-      width: 160px;
-      height: 160px;
+      width: 180px;
+      height: 180px;
       border-radius: 50%;
       object-fit: cover;
       background: #000;
@@ -226,7 +227,6 @@
       justify-content: center;
     }
 
-    /* Модалка превью видеокружка во время записи */
     #video-note-preview-modal {
       display: none;
       position: absolute;
@@ -244,6 +244,7 @@
       object-fit: cover;
       border: 4px solid var(--primary);
       margin-bottom: 15px;
+      background: #000;
     }
 
     #call-container {
@@ -315,7 +316,6 @@
     </div>
   </div>
 
-  <!-- Модальное окно записи видеокружка -->
   <div id="video-note-preview-modal">
     <video id="video-note-preview" autoplay playsinline muted></video>
     <div id="videoNoteTimer" style="color:white; font-size:1.2rem; margin-bottom:15px; font-weight:600;">00:60</div>
@@ -361,14 +361,16 @@ let messages = [];
 let localPlainMessages = {}; 
 let peer = null;
 let localStream = null;
-let isCallActive = false;
 
-// Запись аудио
+// Флаги состояний вызова
+let isCallActive = false;
+let isCalling = false;
+let isAnswering = false;
+
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
-// Запись видеокружков
 let videoNoteRecorder = null;
 let videoNoteChunks = [];
 let isRecordingVideoNote = false;
@@ -491,6 +493,11 @@ function generateUserId() {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
 
+function setCallButtonsDisabled(state) {
+  audioCallBtn.disabled = state;
+  videoCallBtn.disabled = state;
+}
+
 // ============================ ВХОД В КОМНАТУ ============================
 async function enterRoom(roomIdParam) {
   roomId = roomIdParam;
@@ -530,12 +537,18 @@ async function enterRoom(roomIdParam) {
     roomTitle.textContent = `Комната ${roomId} (${count})`;
   });
 
+  const enterTime = Date.now();
   unsubscribeSignals = signalRef.where('target', '==', myUserId).onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
         const data = change.doc.data();
-        change.doc.ref.delete();
-        handleSignal(data);
+        change.doc.ref.delete().catch(() => {});
+        
+        // Фильтруем старые фантомные сигналы (старше 15 сек)
+        const sigTime = data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : Date.now()) : Date.now();
+        if (Math.abs(enterTime - sigTime) < 15000) {
+          handleSignal(data);
+        }
       }
     });
   });
@@ -672,7 +685,6 @@ async function sendMediaMessage(base64Data, type) {
   localPlainMessages[docRef.id] = base64Data;
 }
 
-// Запись голосового сообщения
 recordBtn.addEventListener('click', async () => {
   if (isRecording) {
     if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
@@ -700,43 +712,67 @@ recordBtn.addEventListener('click', async () => {
   }
 });
 
-// ============================ ВИДЕО КРУЖОЧКИ (TELEGRAM STYLE) ============================
+// ============================ ВИДЕО КРУЖОЧКИ (БЕЗ ЗАВИСАНИЙ) ============================
 async function startVideoNoteRecording() {
+  closeVideoNoteModal(); // Безопасная очистка прошлых запусков
+
   try {
+    // Используем максимально легкие и совместимые настройки для мобильных и ПК
     videoNoteStream = await navigator.mediaDevices.getUserMedia({ 
       audio: true, 
-      video: { width: 360, height: 360, facingMode: 'user' } 
+      video: { 
+        width: { ideal: 480 }, 
+        height: { ideal: 480 }, 
+        facingMode: 'user' 
+      } 
     });
+  } catch (e) {
+    console.error("Media error:", e);
+    alert('Не удалось получить доступ к камере или микрофону.');
+    return; // Не блокируем интерфейс
+  }
 
+  try {
     videoNotePreview.srcObject = videoNoteStream;
     videoNoteModal.style.display = 'flex';
 
-    videoNoteRecorder = new MediaRecorder(videoNoteStream, { mimeType: 'video/webm' });
+    let options = { mimeType: 'video/webm' };
+    if (!MediaRecorder.isTypeSupported('video/webm')) {
+      if (MediaRecorder.isTypeSupported('video/mp4')) {
+        options = { mimeType: 'video/mp4' };
+      } else {
+        options = {}; 
+      }
+    }
+
+    videoNoteRecorder = new MediaRecorder(videoNoteStream, options);
     videoNoteChunks = [];
 
     videoNoteRecorder.ondataavailable = event => {
-      if (event.data.size > 0) videoNoteChunks.push(event.data);
+      if (event.data && event.data.size > 0) {
+        videoNoteChunks.push(event.data);
+      }
     };
 
     videoNoteRecorder.onstop = () => {
-      const blob = new Blob(videoNoteChunks, { type: 'video/webm' });
-      const reader = new FileReader();
-      reader.onload = () => sendMediaMessage(reader.result, 'videoNote');
-      reader.readAsDataURL(blob);
-
-      if (videoNoteStream) {
-        videoNoteStream.getTracks().forEach(track => track.stop());
+      const mimeType = videoNoteRecorder.mimeType || 'video/webm';
+      const blob = new Blob(videoNoteChunks, { type: mimeType });
+      
+      if (blob.size > 0) {
+        const reader = new FileReader();
+        reader.onload = () => sendMediaMessage(reader.result, 'videoNote');
+        reader.readAsDataURL(blob);
       }
-      videoNoteModal.style.display = 'none';
-      clearInterval(videoNoteTimerInterval);
-      isRecordingVideoNote = false;
+
+      closeVideoNoteModal();
     };
 
-    videoNoteRecorder.start();
+    videoNoteRecorder.start(1000); 
     isRecordingVideoNote = true;
     videoNoteSecondsLeft = 60;
     videoNoteTimer.textContent = `00:60`;
 
+    if (videoNoteTimerInterval) clearInterval(videoNoteTimerInterval);
     videoNoteTimerInterval = setInterval(() => {
       videoNoteSecondsLeft--;
       const secFormatted = videoNoteSecondsLeft < 10 ? `0${videoNoteSecondsLeft}` : videoNoteSecondsLeft;
@@ -748,13 +784,28 @@ async function startVideoNoteRecording() {
     }, 1000);
 
   } catch (e) {
-    alert('Не удалось получить доступ к видеокамере или микрофону');
+    console.error("Recording error:", e);
+    alert('Ошибка создания записи.');
+    closeVideoNoteModal();
   }
 }
 
+function closeVideoNoteModal() {
+  if (videoNoteStream) {
+    videoNoteStream.getTracks().forEach(track => track.stop());
+    videoNoteStream = null;
+  }
+  videoNotePreview.srcObject = null;
+  videoNoteModal.style.display = 'none';
+  if (videoNoteTimerInterval) clearInterval(videoNoteTimerInterval);
+  isRecordingVideoNote = false;
+}
+
 function stopVideoNoteRecording() {
-  if (videoNoteRecorder && videoNoteRecorder.state === 'recording') {
+  if (videoNoteRecorder && videoNoteRecorder.state !== 'inactive') {
     videoNoteRecorder.stop();
+  } else {
+    closeVideoNoteModal();
   }
 }
 
@@ -801,28 +852,49 @@ leaveRoomBtn.addEventListener('click', () => {
   hangupCall();
 });
 
-// ============================ WEBRTC ЗВОНКИ ============================
+// ============================ WEBRTC ЗВОНКИ (ПОЛНЫЙ ФИКС ОШИБОК) ============================
 function handleSignal(data) {
   const { signal, from, fromName, callType } = data;
 
-  if (!isCallActive && !peer) {
+  if (!isCallActive && !isCalling && !isAnswering && !peer) {
+    isAnswering = true;
+    setCallButtonsDisabled(true);
+
     const isVideoCall = (callType === 'video');
     const callKindText = isVideoCall ? 'Видеозвонок' : 'Аудиозвонок';
 
-    if (confirm(`Входящий ${callKindText} от ${fromName || 'собеседника'}. Принять?`)) {
-      startPeer(false, from, isVideoCall, signal);
+    setTimeout(() => {
+      if (confirm(`Входящий ${callKindText} от ${fromName || 'собеседника'}. Принять?`)) {
+        startPeer(false, from, isVideoCall, signal);
+      } else {
+        isAnswering = false;
+        setCallButtonsDisabled(false);
+      }
+    }, 50);
+  } else if (peer && (isCallActive || isCalling || isAnswering)) {
+    try {
+      peer.signal(signal);
+    } catch(e) {
+      console.warn("Signal handeling skipped:", e);
     }
-  } else if (peer && isCallActive) {
-    peer.signal(signal);
   }
 }
 
+// Безопасный захват медиаустройств с автоматическим понижением требований
 async function getUserMediaSmart(wantVideo) {
   if (wantVideo) {
     try {
-      return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      return await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } } 
+      });
     } catch (e) {
-      console.warn("Видеокамера недоступна, подключаемся в режиме аудио:", e);
+      console.warn("Камера недоступна или занята, попытка подключить только видео со стандартными настройками...", e);
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      } catch (e2) {
+        console.warn("Переход на только Аудио режим:", e2);
+      }
     }
   }
   return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -831,9 +903,16 @@ async function getUserMediaSmart(wantVideo) {
 async function startPeer(isInitiator, targetUserId, wantVideo, incomingSignal = null) {
   const target = participants[targetUserId];
   if (!target) {
-    alert('Собеседник не найден');
+    alert('Собеседник недоступен');
+    hangupCall();
     return;
   }
+
+  // Очистка старых сессий
+  if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+
+  setCallButtonsDisabled(true);
 
   try {
     const stream = await getUserMediaSmart(wantVideo);
@@ -847,9 +926,9 @@ async function startPeer(isInitiator, targetUserId, wantVideo, incomingSignal = 
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:openrelay.metered.ca:80' },
-          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' }
         ]
       }
     });
@@ -868,53 +947,70 @@ async function startPeer(isInitiator, targetUserId, wantVideo, incomingSignal = 
     peer.on('stream', rStream => {
       remoteVideo.srcObject = rStream;
       remoteAudio.srcObject = rStream;
-      
-      const playPromise = remoteVideo.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => remoteAudio.play().catch(e => console.log('Audio play err:', e)));
-      }
+
+      // Принудительный запуск воспроизведения без блокировки браузером
+      remoteVideo.play().catch(e => console.warn("Autoplay video error:", e));
+      remoteAudio.play().catch(e => console.warn("Autoplay audio error:", e));
     });
 
     peer.on('error', err => {
-      console.error('Peer error:', err);
+      console.error('Peer connection error:', err);
       hangupCall();
     });
 
     peer.on('close', () => hangupCall());
 
-    if (incomingSignal) peer.signal(incomingSignal);
+    if (incomingSignal) {
+      peer.signal(incomingSignal);
+    }
 
     isCallActive = true;
+    isCalling = false;
+    isAnswering = false;
     callContainer.style.display = 'flex';
     callInfo.textContent = isInitiator ? `Звонок ${target.name}...` : `Разговор с ${target.name}`;
 
   } catch (err) {
-    alert('Ошибка доступа к медиаустройствам: ' + err.message);
+    alert('Ошибка подключения медиаустройств: ' + err.message);
     hangupCall();
   }
 }
 
 function hangupCall() {
-  if (peer) { peer.destroy(); peer = null; }
-  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  isCalling = false;
+  isAnswering = false;
+  isCallActive = false;
+
+  if (peer) { 
+    try { peer.destroy(); } catch(e){}
+    peer = null; 
+  }
+  if (localStream) { 
+    localStream.getTracks().forEach(t => t.stop()); 
+    localStream = null; 
+  }
+
   remoteVideo.srcObject = null;
   remoteAudio.srcObject = null;
   localVideo.srcObject = null;
   callContainer.style.display = 'none';
-  isCallActive = false;
+
+  setCallButtonsDisabled(false);
 }
 
 audioCallBtn.addEventListener('click', () => {
-  if (isCallActive) return;
+  if (isCallActive || isCalling || isAnswering) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
   if (!targetId) return alert('Нет собеседника в комнате!');
+  isCalling = true;
   startPeer(true, targetId, false);
 });
 
 videoCallBtn.addEventListener('click', () => {
-  if (isCallActive) return;
+  if (isCallActive || isCalling || isAnswering) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
   if (!targetId) return alert('Нет собеседника в комнате!');
+  isCalling = true;
   startPeer(true, targetId, true);
 });
 
