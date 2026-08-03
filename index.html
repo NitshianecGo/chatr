@@ -2,353 +2,385 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Chat App - стабильный</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Secure Chat</title>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <!-- simple-peer -->
-  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+  <!-- PeerJS -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <!-- tweetnacl для шифрования -->
+  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
   <style>
-    /* === Стили без изменений (те же, что и в прошлой версии) === */
-    :root {
-      --bg-body: #0f172a;
-      --bg-app: #1e293b;
-      --bg-messages: #0f172a;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --border-color: #334155;
-      --primary: #3b82f6;
-      --primary-hover: #60a5fa;
-      --msg-sent: #2563eb;
-      --msg-sent-text: #ffffff;
-      --msg-received: #334155;
-      --msg-received-text: #f8fafc;
-    }
+    /* ---------- Стили (современный тёмный дизайн) ---------- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: var(--bg-body);
-      color: var(--text-main);
-      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
       display: flex;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
+      padding: 10px;
     }
     #app {
       width: 100%;
-      max-width: 480px;
-      height: 100vh;
-      max-height: 800px;
-      background: var(--bg-app);
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
-      display: flex;
-      flex-direction: column;
-      border-radius: 20px;
-      overflow: hidden;
-      position: relative;
-    }
-    #home {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      padding: 20px;
-      text-align: center;
-    }
-    #home h1 { font-size: 2rem; margin-bottom: 10px; }
-    #home p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; }
-    .btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px 24px;
+      max-width: 1100px;
+      background: rgba(30, 41, 59, 0.9);
       border-radius: 30px;
+      padding: 20px 15px;
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
+      border: 1px solid #334155;
+      backdrop-filter: blur(8px);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #3b82f6;
+      text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+    .header .subtitle {
+      color: #94a3b8;
       font-size: 1rem;
+      border-top: 1px solid #334155;
+      border-bottom: 1px solid #334155;
+      padding: 6px 0;
+    }
+    .btn {
+      background: #3b82f6;
+      border: none;
+      color: white;
       font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 60px;
       cursor: pointer;
       transition: all 0.2s;
+      font-size: 1rem;
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      box-shadow: 0 4px 0 #1e40af;
+      touch-action: manipulation;
+      min-height: 48px;
     }
-    .btn:hover { background: var(--primary-hover); }
-    #chat { display: none; flex-direction: column; height: 100%; }
-    #header {
-      padding: 8px 12px;
-      background: var(--bg-app);
-      border-bottom: 1px solid var(--border-color);
+    .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1e40af; }
+    .btn-secondary { background: #475569; box-shadow: 0 4px 0 #1e293b; }
+    .btn-success { background: #22c55e; box-shadow: 0 4px 0 #15803d; }
+    .btn-danger { background: #ef4444; box-shadow: 0 4px 0 #b91c1c; }
+    .btn-sm { padding: 8px 16px; font-size: 0.9rem; min-height: 40px; }
+    .flex-row {
       display: flex;
       flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-    #header h2 { font-size: 0.9rem; font-weight: 600; }
-    #header-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      align-items: center;
-    }
-    #header-actions button {
-      background: none;
-      border: none;
-      font-size: 0.8rem;
-      cursor: pointer;
-      padding: 4px 6px;
-      border-radius: 6px;
-      color: var(--text-main);
-      background: var(--border-color);
-    }
-    #header-actions button:hover { background: var(--primary); }
-    .call-btn { font-size: 0.65rem !important; padding: 2px 5px !important; min-width: 28px; }
-    #messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
       gap: 10px;
-      background: var(--bg-messages);
+      justify-content: center;
+      align-items: center;
+      margin: 10px 0;
     }
-    .msg {
-      max-width: 80%;
-      padding: 10px 14px;
-      border-radius: 18px;
-      word-wrap: break-word;
-      font-size: 0.95rem;
-      line-height: 1.4;
-    }
-    .msg-sent {
-      align-self: flex-end;
-      background: var(--msg-sent);
-      color: var(--msg-sent-text);
-      border-bottom-right-radius: 4px;
-    }
-    .msg-received {
-      align-self: flex-start;
-      background: var(--msg-received);
-      color: var(--msg-received-text);
-      border: 1px solid var(--border-color);
-      border-bottom-left-radius: 4px;
-    }
-    .msg-name { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; }
-    .msg-sent .msg-name { color: #bfdbfe; }
-    .msg-time { font-size: 0.65rem; opacity: 0.7; margin-top: 4px; text-align: right; }
-    .msg-audio audio { max-width: 200px; height: 36px; }
-    .msg-photo img { max-width: 200px; border-radius: 12px; border: 1px solid var(--border-color); }
-    #emoji-picker {
+    .video-grid {
       display: none;
-      padding: 8px;
-      background: var(--bg-app);
-      border-top: 1px solid var(--border-color);
       flex-wrap: wrap;
-      gap: 8px;
-      max-height: 110px;
-      overflow-y: auto;
-    }
-    #emoji-picker span { font-size: 1.3rem; cursor: pointer; padding: 4px; }
-    #input-area {
-      padding: 10px 12px;
-      background: var(--bg-app);
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      flex-shrink: 0;
-      flex-wrap: wrap;
-    }
-    #input-area input {
-      flex: 1;
-      border: 1px solid var(--border-color);
-      background: var(--bg-body);
-      color: var(--text-main);
-      border-radius: 24px;
-      padding: 10px 14px;
-      font-size: 0.95rem;
-      outline: none;
-      min-width: 120px;
-    }
-    .icon-btn {
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 50%;
-      color: var(--text-main);
-    }
-    #sendBtn {
-      background: var(--primary);
-      border: none;
-      color: white;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.1rem;
-      cursor: pointer;
-    }
-    #selfie-modal {
-      display: none;
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.92);
-      z-index: 50;
-      flex-direction: column;
-      align-items: center;
+      gap: 12px;
       justify-content: center;
-      padding: 20px;
+      margin: 15px 0;
     }
-    #selfie-video {
-      width: 100%;
-      max-width: 320px;
-      border-radius: 20px;
-      background: #000;
-      transform: scaleX(-1);
-    }
-    #selfie-controls {
-      display: flex;
-      gap: 20px;
-      margin-top: 20px;
-    }
-    #selfie-controls button {
-      background: var(--primary);
-      border: none;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 30px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    #selfie-controls .close-btn { background: #ef4444; }
-    #call-container {
-      display: none;
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.95);
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 30;
-    }
-    #call-container video {
-      width: 100%; max-width: 360px;
-      background: #1e293b;
-      border-radius: 12px;
-    }
-    #call-controls button {
-      background: #ef4444; border: none; color: white;
-      border-radius: 50%; width: 56px; height: 56px;
-      font-size: 1.4rem; cursor: pointer; margin-top: 20px;
-    }
-    .call-info { color: white; font-size: 1.1rem; margin-bottom: 15px; font-weight: 600; }
-    #incoming-call-modal {
-      display: none;
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85);
-      z-index: 40;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .call-modal-box {
-      background: var(--bg-app);
-      padding: 24px;
+    .video-grid.active { display: flex; }
+    .video-box {
+      flex: 1 1 200px;
+      min-width: 140px;
+      background: #0a0505;
+      border: 2px solid #3b82f6;
       border-radius: 16px;
-      text-align: center;
-      border: 1px solid var(--border-color);
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 4/3;
     }
-    .call-modal-actions {
+    .video-box video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #111;
+      display: block;
+    }
+    /* Зеркальное отображение для локального видео */
+    #localVideo { transform: scaleX(-1); }
+    .video-box .label {
+      position: absolute;
+      bottom: 6px;
+      left: 6px;
+      background: rgba(0,0,0,0.7);
+      padding: 2px 12px;
+      border-radius: 30px;
+      font-size: 0.8rem;
+      color: #f8fafc;
+      border: 1px solid #3b82f6;
+    }
+    .chat-area {
+      display: none;
+      margin-top: 15px;
+      border-top: 1px solid #334155;
+      padding-top: 12px;
+    }
+    .chat-area.active { display: block; }
+    .chat-messages {
+      max-height: 200px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #334155;
+    }
+    .chat-messages .msg {
+      background: rgba(30, 41, 59, 0.6);
+      border-radius: 10px;
+      padding: 5px 10px;
+      margin-bottom: 5px;
+      color: #f8fafc;
+      word-break: break-word;
+      font-size: 0.95rem;
+    }
+    .chat-messages .msg .sender { color: #60a5fa; font-weight: bold; }
+    .chat-messages .msg .time { color: #94a3b8; font-size: 0.7rem; margin-left: 8px; }
+    .chat-messages .msg img, .chat-messages .msg video {
+      max-width: 120px;
+      border-radius: 8px;
+      margin-top: 4px;
+      border: 1px solid #3b82f6;
+    }
+    .chat-input-row {
       display: flex;
-      gap: 16px;
-      justify-content: center;
-      margin-top: 20px;
+      gap: 8px;
+      flex-wrap: wrap;
     }
-    .btn-accept { background: #22c55e; color: white; }
-    .btn-reject { background: #ef4444; color: white; }
+    .chat-input-row input[type="text"] {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 10px 14px;
+      border-radius: 60px;
+      font-size: 1rem;
+      min-width: 120px;
+      min-height: 44px;
+    }
+    .chat-input-row input[type="text"]::placeholder { color: #64748b; }
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      left: 0; top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+    .call-controls {
+      display: none;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 10px 0;
+    }
+    .call-controls.active { display: flex; }
+    .invite-area {
+      display: none;
+      background: #1e293b;
+      border: 1px dashed #3b82f6;
+      border-radius: 16px;
+      padding: 12px;
+      margin: 12px 0;
+      word-break: break-all;
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+    .invite-area.active { display: block; }
+    .invite-area .link-label { font-weight: bold; color: #3b82f6; }
+    .invite-area a { color: #60a5fa; text-decoration: underline; }
+    .timer { color: #facc15; font-weight: bold; }
+    .status {
+      text-align: center;
+      font-size: 1rem;
+      padding: 10px;
+      border-radius: 60px;
+      background: rgba(0,0,0,0.3);
+      margin: 10px 0;
+      color: #f8fafc;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: #1e293b;
+      border: 1px solid #3b82f6;
+      border-radius: 30px;
+      padding: 25px 20px;
+      max-width: 500px;
+      width: 100%;
+      color: #f8fafc;
+      box-shadow: 0 0 50px rgba(59, 130, 246, 0.2);
+    }
+    .modal-content h2 { text-align: center; margin-bottom: 15px; color: #3b82f6; }
+    .modal-content label { display: block; margin: 10px 0 4px; font-size: 1rem; }
+    .modal-content input, .modal-content select {
+      width: 100%;
+      padding: 10px 14px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      border-radius: 60px;
+      font-size: 1rem;
+      min-height: 44px;
+    }
+    .modal-content .btn { width: 100%; margin-top: 12px; }
+    .input-field {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 12px 18px;
+      border-radius: 60px;
+      font-size: 1rem;
+      min-width: 140px;
+      flex: 1;
+      min-height: 44px;
+    }
+    .input-field::placeholder { color: #64748b; }
+
+    /* Блок начального меню */
+    .block-init { display: block; }
+    .block-call { display: none; }
+
+    @media (max-width: 600px) {
+      .header h1 { font-size: 1.8rem; }
+      .video-box { flex: 1 1 130px; min-width: 100px; }
+      .btn { font-size: 0.9rem; padding: 12px 18px; min-height: 48px; }
+      .btn-sm { padding: 8px 14px; min-height: 40px; font-size: 0.85rem; }
+      .modal-content { padding: 20px 15px; }
+    }
   </style>
 </head>
 <body>
+
 <div id="app">
-  <div id="home">
-    <h1>📱 Chat</h1>
-    <p>Стабильное присутствие</p>
-    <button class="btn" id="createRoomBtn">➕ Создать комнату</button>
+  <div class="header">
+    <h1>🔒 Secure Chat</h1>
+    <div class="subtitle">Шифрование • Звонки • Файлы</div>
   </div>
 
-  <div id="chat">
-    <div id="header">
-      <h2 id="roomTitle">Комната</h2>
-      <div id="header-actions">
-        <button id="copyLinkBtn" title="Скопировать ссылку">🔗</button>
-        <!-- 5 кнопок для аудиозвонков -->
-        <button class="call-btn" data-config="0">📞1</button>
-        <button class="call-btn" data-config="1">📞2</button>
-        <button class="call-btn" data-config="2">📞3</button>
-        <button class="call-btn" data-config="3">📞4</button>
-        <button class="call-btn" data-config="4">📞5</button>
-        <button id="videoCallBtn" title="Видеозвонок">📹</button>
-        <button id="leaveRoomBtn" title="Выйти">✕</button>
+  <!-- БЛОК НАЧАЛЬНОГО МЕНЮ -->
+  <div id="initBlock" class="block-init">
+    <div class="flex-row">
+      <button class="btn btn-success" id="createRoomBtn">➕ Создать комнату</button>
+      <button class="btn btn-secondary" id="joinRoomBtn">🔗 Присоединиться</button>
+      <button class="btn btn-secondary" id="testDeviceBtn">🎤 Проверить устройства</button>
+    </div>
+    <div id="joinPanel" style="display: none; margin-top: 15px;">
+      <div class="flex-row">
+        <input class="input-field" id="roomInput" placeholder="ID комнаты" />
+        <input class="input-field" id="tokenInput" placeholder="Токен" />
+        <button class="btn btn-secondary btn-sm" id="doJoinBtn">Войти</button>
+      </div>
+      <div style="text-align:center;color:#94a3b8;font-size:0.9rem;margin-top:5px;">
+        <i>Введите ID и токен из пригласительной ссылки.</i>
       </div>
     </div>
-    <div id="messages"></div>
-
-    <div id="emoji-picker">
-      <span>😀</span><span>😂</span><span>😍</span><span>👍</span><span>❤️</span>
-      <span>🔥</span><span>🎉</span><span>😎</span><span>🙏</span><span>💩</span>
-    </div>
-
-    <div id="input-area">
-      <button class="icon-btn" id="emojiBtn">😀</button>
-      <button class="icon-btn" id="recordBtn" title="Голосовое">🎤</button>
-      <button class="icon-btn" id="selfieBtn" title="Селфи">🤳</button>
-      <input id="msgInput" placeholder="Сообщение..." autocomplete="off">
-      <button id="sendBtn">➤</button>
-    </div>
+    <div id="statusInit" class="status" style="margin-top:20px; background:transparent;">Готов к связи</div>
   </div>
 
-  <!-- Селфи -->
-  <div id="selfie-modal">
-    <video id="selfie-video" autoplay playsinline muted></video>
-    <div id="selfie-controls">
-      <button id="takeSelfieBtn">📸 Сделать</button>
-      <button class="close-btn" id="closeSelfieBtn">✕ Закрыть</button>
-    </div>
-  </div>
-
-  <!-- Звонки -->
-  <div id="call-container">
-    <div class="call-info" id="callInfo">Звонок...</div>
-    <video id="remoteVideo" autoplay playsinline></video>
-    <video id="localVideo" autoplay playsinline muted style="width:100px; position:absolute; bottom:90px; right:20px; border-radius:10px; background:#1e293b;"></video>
-    <audio id="remoteAudio" autoplay></audio>
-    <div id="call-controls">
-      <button id="hangupBtn">📴</button>
-    </div>
-  </div>
-
-  <div id="incoming-call-modal">
-    <div class="call-modal-box">
-      <h3 id="incomingCallText">Входящий звонок</h3>
-      <div class="call-modal-actions">
-        <button class="btn btn-accept" id="acceptCallBtn">📞 Ответить</button>
-        <button class="btn btn-reject" id="rejectCallBtn">📴 Отклонить</button>
+  <!-- БЛОК ЗВОНКА И ЧАТА -->
+  <div id="callBlock" class="block-call">
+    <div class="video-grid" id="videoGrid">
+      <div class="video-box">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <div class="label">Я</div>
+      </div>
+      <div class="video-box">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div class="label">Товарищ</div>
       </div>
     </div>
+
+    <div class="call-controls" id="callControls">
+      <button class="btn btn-sm" id="toggleAudioBtn">🔇 Заглушить</button>
+      <button class="btn btn-sm" id="toggleVideoBtn">📷 Выключить</button>
+      <button class="btn btn-danger btn-sm" id="hangupBtn">⛔ Прервать</button>
+    </div>
+
+    <div class="chat-area" id="chatArea">
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Введите сообщение..." />
+        <button class="btn btn-sm" id="sendChatBtn">Отправить</button>
+        <div class="file-input-wrapper">
+          <button class="btn btn-sm btn-secondary">📎 Файл</button>
+          <input type="file" id="fileInput" accept="image/*,video/*" multiple />
+        </div>
+      </div>
+    </div>
+
+    <div class="invite-area" id="inviteArea">
+      <div><span class="link-label">🔗 Пригласительная ссылка (действительна 5 мин):</span></div>
+      <div><a id="inviteLink" href="#" target="_blank">Ссылка</a></div>
+      <div class="flex-row" style="gap:8px; margin-top:6px;">
+        <button class="btn btn-secondary btn-sm" id="copyLinkBtn">📋 Копировать</button>
+        <button class="btn btn-secondary btn-sm" id="refreshLinkBtn">🔄 Обновить</button>
+      </div>
+      <div style="font-size:0.85rem; color:#94a3b8; margin-top:4px;">
+        Токен обновляется каждые 5 мин.
+        <span id="timerDisplay" class="timer">(до смены: 5:00)</span>
+      </div>
+    </div>
+
+    <div class="status" id="statusDisplay">⏳ Ожидание соединения...</div>
   </div>
 </div>
 
 <script>
-window.global = window;
+// ======================================================================
+// 1. КОНФИГУРАЦИЯ
+// ======================================================================
+const PEER_OPTIONS = {
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    ]
+  }
+};
+const SECRET = "SecureChat2026_SecretKey";
 
-// ============================ FIREBASE ============================
+// ======================================================================
+// 2. FIREBASE (для хранения сообщений)
+// ======================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
   authDomain: "chatt-6d410.firebaseapp.com",
@@ -360,495 +392,578 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ============================ СОСТОЯНИЯ ============================
-let roomId = '', myName = '', myUserId = '';
-let roomRef = null, messagesRef = null, participantsRef = null, signalRef = null;
-let unsubscribeMessages = null, unsubscribeParticipants = null, unsubscribeSignals = null;
-const processedMsgIds = new Set();
-let participants = {};
+// ======================================================================
+// 3. ШИФРОВАНИЕ (tweetnacl)
+// ======================================================================
+function generateKeyPair() {
+  const pair = nacl.box.keyPair();
+  return {
+    publicKey: nacl.util.encodeBase64(pair.publicKey),
+    secretKey: nacl.util.encodeBase64(pair.secretKey)
+  };
+}
+function encryptMessage(message, recipientPublicKey, senderSecretKey) {
+  const recipientPub = nacl.util.decodeBase64(recipientPublicKey);
+  const senderSec = nacl.util.decodeBase64(senderSecretKey);
+  const nonce = nacl.randomBytes(24);
+  const msgUint8 = new TextEncoder().encode(message);
+  const encrypted = nacl.box(msgUint8, nonce, recipientPub, senderSec);
+  return {
+    nonce: nacl.util.encodeBase64(nonce),
+    encrypted: nacl.util.encodeBase64(encrypted)
+  };
+}
+function decryptMessage(encryptedPackage, senderPublicKey, recipientSecretKey) {
+  try {
+    const { nonce, encrypted } = encryptedPackage;
+    const senderPub = nacl.util.decodeBase64(senderPublicKey);
+    const recipientSec = nacl.util.decodeBase64(recipientSecretKey);
+    const nonceUint8 = nacl.util.decodeBase64(nonce);
+    const encryptedUint8 = nacl.util.decodeBase64(encrypted);
+    const decrypted = nacl.box.open(encryptedUint8, nonceUint8, senderPub, recipientSec);
+    if (!decrypted) throw new Error('Decryption failed');
+    return new TextDecoder().decode(decrypted);
+  } catch (e) {
+    console.warn('Decryption error:', e);
+    return null;
+  }
+}
 
-let peer = null, localStream = null, isCallActive = false, pendingCallData = null;
-let mediaRecorder = null, audioChunks = [], isRecording = false;
-let selfieStream = null;
-let heartbeatInterval = null;
+// ======================================================================
+// 4. УПРАВЛЕНИЕ ТОКЕНАМИ И ПРИГЛАШЕНИЯМИ
+// ======================================================================
+function getCurrentWindow() {
+  return Math.floor(Date.now() / 1000 / 300);
+}
+function generateToken(roomId, windowMinutes) {
+  const data = roomId + ':' + windowMinutes + ':' + SECRET;
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const ch = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + ch;
+    hash |= 0;
+  }
+  return 't' + Math.abs(hash).toString(36).substring(0, 8);
+}
+function getValidTokens(roomId) {
+  const cur = getCurrentWindow();
+  return [generateToken(roomId, cur), generateToken(roomId, cur - 1)];
+}
+function isTokenValid(roomId, token) {
+  return getValidTokens(roomId).includes(token);
+}
+function buildInviteLink(roomId, token) {
+  const base = window.location.origin + window.location.pathname;
+  return base + '?room=' + encodeURIComponent(roomId) + '&token=' + encodeURIComponent(token);
+}
 
-// DOM (как и раньше)
-const home = document.getElementById('home');
-const chat = document.getElementById('chat');
-const messagesDiv = document.getElementById('messages');
-const msgInput = document.getElementById('msgInput');
-const sendBtn = document.getElementById('sendBtn');
-const createRoomBtn = document.getElementById('createRoomBtn');
-const roomTitle = document.getElementById('roomTitle');
-const leaveRoomBtn = document.getElementById('leaveRoomBtn');
-const videoCallBtn = document.getElementById('videoCallBtn');
-const recordBtn = document.getElementById('recordBtn');
-const selfieBtn = document.getElementById('selfieBtn');
-const emojiBtn = document.getElementById('emojiBtn');
-const emojiPicker = document.getElementById('emoji-picker');
-const copyLinkBtn = document.getElementById('copyLinkBtn');
+// ======================================================================
+// 5. СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+// ======================================================================
+let currentRoom = null;
+let currentToken = null;
+let peer = null;
+let conn = null;          // DataConnection
+let call = null;          // MediaConnection
+let localStream = null;
+let remoteStream = null;
+let isInitiator = false;
+let timerInterval = null;
+let lifetimeTimer = null;
+let roomLifetimeMs = 15 * 60000;
+let messages = [];
+let hasVideo = false;
+let hasAudio = false;
+let myKeyPair = null;
+let peerPublicKey = null; // публичный ключ собеседника (для шифрования)
 
-const callContainer = document.getElementById('call-container');
-const remoteVideo = document.getElementById('remoteVideo');
+// DOM элементы
+const initBlock = document.getElementById('initBlock');
+const callBlock = document.getElementById('callBlock');
+const statusInit = document.getElementById('statusInit');
+const statusDisplay = document.getElementById('statusDisplay');
 const localVideo = document.getElementById('localVideo');
-const remoteAudio = document.getElementById('remoteAudio');
+const remoteVideo = document.getElementById('remoteVideo');
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendChatBtn = document.getElementById('sendChatBtn');
+const fileInput = document.getElementById('fileInput');
+const inviteLink = document.getElementById('inviteLink');
+const timerDisplay = document.getElementById('timerDisplay');
+const createRoomBtn = document.getElementById('createRoomBtn');
+const joinRoomBtn = document.getElementById('joinRoomBtn');
+const joinPanel = document.getElementById('joinPanel');
+const roomInput = document.getElementById('roomInput');
+const tokenInput = document.getElementById('tokenInput');
+const doJoinBtn = document.getElementById('doJoinBtn');
+const testDeviceBtn = document.getElementById('testDeviceBtn');
+const toggleAudioBtn = document.getElementById('toggleAudioBtn');
+const toggleVideoBtn = document.getElementById('toggleVideoBtn');
 const hangupBtn = document.getElementById('hangupBtn');
-const callInfo = document.getElementById('callInfo');
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const refreshLinkBtn = document.getElementById('refreshLinkBtn');
 
-const incomingCallModal = document.getElementById('incoming-call-modal');
-const incomingCallText = document.getElementById('incomingCallText');
-const acceptCallBtn = document.getElementById('acceptCallBtn');
-const rejectCallBtn = document.getElementById('rejectCallBtn');
-
-const selfieModal = document.getElementById('selfie-modal');
-const selfieVideo = document.getElementById('selfie-video');
-const takeSelfieBtn = document.getElementById('takeSelfieBtn');
-const closeSelfieBtn = document.getElementById('closeSelfieBtn');
-
-// ============================ КОНФИГУРАЦИИ ЗВОНКОВ ============================
-const callConfigs = [
-  { name: 'Макс STUN', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.ekiga.net' }, { urls: 'stun:global.stun.twilio.com:3478' }], trickle: true },
-  { name: 'TURN OpenRelay', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80' }, { urls: 'turn:openrelay.metered.ca:443' }, { urls: 'turn:openrelay.metered.ca:3478' }], trickle: true },
-  { name: 'TURN Twilio', iceServers: [{ urls: 'stun:global.stun.twilio.com:3478' }, { urls: 'turn:global.turn.twilio.com:3478?transport=udp' }, { urls: 'turn:global.turn.twilio.com:3478?transport=tcp' }], trickle: true },
-  { name: 'TURN Metered', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:turn.metered.ca:80' }, { urls: 'turn:turn.metered.ca:443' }, { urls: 'turn:turn.metered.ca:3478' }], trickle: true },
-  { name: 'Комбо + trickle:false', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' }, { urls: 'turn:openrelay.metered.ca:3478' }], trickle: false }
-];
-
-// ============================ ВСПОМОГАТЕЛЬНЫЕ ============================
-function generateRandomName() {
-  const adjs = ['Быстрый', 'Тихий', 'Умный', 'Сильный', 'Весёлый', 'Смелый'];
-  const nouns = ['Лис', 'Волк', 'Заяц', 'Сокол', 'Дельфин', 'Тигр'];
-  return adjs[Math.floor(Math.random() * adjs.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
-}
-
-function getUserId() {
-  // Сохраняем userId в sessionStorage, чтобы при перезагрузке использовать тот же
-  let id = sessionStorage.getItem('chatUserId');
-  if (!id) {
-    id = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-    sessionStorage.setItem('chatUserId', id);
+// ======================================================================
+// 6. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ======================================================================
+function addMessage(sender, content, mediaType = 'text', timestamp = Date.now()) {
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const timeStr = new Date(timestamp).toLocaleTimeString();
+  let displayContent = content;
+  if (mediaType === 'image') {
+    displayContent = `<img src="${content}" alt="Изображение" />`;
+  } else if (mediaType === 'video') {
+    displayContent = `<video src="${content}" controls style="max-width:120px;max-height:120px;"></video>`;
   }
-  return id;
+  div.innerHTML = `<span class="sender">${sender}</span> <span class="time">${timeStr}</span><br>${displayContent}`;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  // Сохраняем в Firestore (если есть комната)
+  if (currentRoom) {
+    db.collection('rooms').doc(currentRoom).collection('messages').add({
+      sender,
+      content,
+      mediaType,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => console.warn('Firestore save error:', err));
+  }
 }
 
-function formatTime(timestamp) {
-  if (!timestamp) return '';
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+function loadHistoryFromFirestore() {
+  if (!currentRoom) return;
+  db.collection('rooms').doc(currentRoom).collection('messages')
+    .orderBy('timestamp', 'asc')
+    .limit(50)
+    .get()
+    .then(snapshot => {
+      chatMessages.innerHTML = '';
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        addMessage(data.sender, data.content, data.mediaType, data.timestamp?.toMillis?.() || Date.now());
+      });
+    })
+    .catch(err => console.warn('Load history error:', err));
 }
 
-// ============================ ВХОД / ВЫХОД ============================
-async function enterRoom(roomIdParam) {
-  roomId = roomIdParam;
-  myUserId = getUserId();
-  myName = generateRandomName();
+// ======================================================================
+// 7. ПРОВЕРКА УСТРОЙСТВ
+// ======================================================================
+async function testDevices() {
+  statusInit.textContent = '🔍 Проверка устройств...';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    stream.getTracks().forEach(t => t.stop());
+    statusInit.textContent = '✅ Все устройства работают!';
+  } catch (e) {
+    statusInit.textContent = '⚠️ Частичная ошибка: ' + e.message + '. Попробуйте войти без видео.';
+    console.warn(e);
+  }
+}
 
-  roomRef = db.collection('rooms').doc(roomId);
-  messagesRef = roomRef.collection('messages');
-  participantsRef = roomRef.collection('participants');
-  signalRef = roomRef.collection('signals');
+// ======================================================================
+// 8. ЗАПУСК МЕДИА (с отказоустойчивостью)
+// ======================================================================
+async function getMedia() {
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    hasVideo = true; hasAudio = true;
+    return stream;
+  } catch (e1) {
+    console.warn('Видео+аудио не доступны, пробуем только аудио:', e1.message);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      hasVideo = false; hasAudio = true;
+      return stream;
+    } catch (e2) {
+      console.warn('Аудио не доступно, пробуем только видео:', e2.message);
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+        hasVideo = true; hasAudio = false;
+        return stream;
+      } catch (e3) {
+        console.warn('Ничего не доступно, создаём пустой поток:', e3.message);
+        return new MediaStream();
+      }
+    }
+  }
+}
 
-  // ---------- ОЧИСТКА СТАРЫХ УЧАСТНИКОВ ----------
-  // Удаляем всех участников, у которых joinedAt старше 10 секунд (они "умерли")
-  const tenSecondsAgo = new Date(Date.now() - 10000);
-  const oldParticipants = await participantsRef
-    .where('joinedAt', '<', tenSecondsAgo)
-    .get();
-  const batch = db.batch();
-  oldParticipants.forEach(doc => batch.delete(doc.ref));
-  await batch.commit();
-
-  // ---------- ОБНОВЛЕНИЕ / СОЗДАНИЕ УЧАСТНИКА ----------
-  // Проверяем, есть ли уже участник с таким userId (перезагрузка)
-  const existing = await participantsRef.doc(myUserId).get();
-  if (existing.exists) {
-    // Обновляем время
-    await participantsRef.doc(myUserId).update({
-      name: myName,
-      joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+// ======================================================================
+// 9. ПОКАЗАТЬ/СКРЫТЬ БЛОК ЗВОНКА
+// ======================================================================
+function showCallBlock() {
+  callBlock.style.display = 'block';
+  document.getElementById('videoGrid').classList.add('active');
+  document.getElementById('callControls').classList.add('active');
+  document.getElementById('chatArea').classList.add('active');
+  document.getElementById('inviteArea').classList.add('active');
+  if (!hasVideo) {
+    localVideo.style.display = 'none';
+    remoteVideo.style.display = 'none';
   } else {
-    await participantsRef.doc(myUserId).set({
-      name: myName,
-      joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    localVideo.style.display = 'block';
+    remoteVideo.style.display = 'block';
   }
+}
+function hideCallBlock() {
+  callBlock.style.display = 'none';
+  document.getElementById('videoGrid').classList.remove('active');
+  document.getElementById('callControls').classList.remove('active');
+  document.getElementById('chatArea').classList.remove('active');
+  document.getElementById('inviteArea').classList.remove('active');
+  localVideo.style.display = 'block';
+  remoteVideo.style.display = 'block';
+}
 
-  // ---------- ПОДПИСКИ ----------
-  unsubscribeParticipants = participantsRef.onSnapshot(snapshot => {
-    participants = {};
-    snapshot.forEach(doc => {
-      participants[doc.id] = doc.data();
+// ======================================================================
+// 10. СОЗДАНИЕ КОМНАТЫ
+// ======================================================================
+async function createRoom() {
+  try {
+    statusInit.textContent = '🛠 Создаём комнату...';
+    const roomId = 'chat-' + Math.random().toString(36).substring(2, 10);
+    currentRoom = roomId;
+    isInitiator = true;
+
+    // Генерируем ключи шифрования
+    myKeyPair = generateKeyPair();
+
+    const stream = await getMedia();
+    localStream = stream;
+    if (hasVideo) localVideo.srcObject = stream;
+
+    peer = new Peer(roomId, PEER_OPTIONS);
+    await new Promise((resolve, reject) => {
+      peer.on('open', () => resolve());
+      peer.on('error', reject);
     });
-    // Убираем "мёртвых" участников из списка (хотя они уже удалены, но на всякий случай)
+
+    // Обработка входящих DataConnection
+    peer.on('connection', (dataConn) => {
+      if (conn) { dataConn.close(); return; }
+      conn = dataConn;
+      conn.on('open', () => {
+        statusDisplay.textContent = '✅ Соединение для чата установлено!';
+        // Отправляем свой публичный ключ
+        conn.send(JSON.stringify({ type: 'key', publicKey: myKeyPair.publicKey }));
+        loadHistoryFromFirestore();
+      });
+      conn.on('data', (data) => handleIncomingData(data));
+      conn.on('close', () => { conn = null; statusDisplay.textContent = '⚠️ Соединение чата разорвано.'; });
+    });
+
+    // Обработка входящих звонков
+    peer.on('call', (incomingCall) => {
+      if (call) { incomingCall.answer(); return; }
+      call = incomingCall;
+      call.answer(localStream);
+      call.on('stream', (remote) => {
+        remoteStream = remote;
+        remoteVideo.srcObject = remote;
+        statusDisplay.textContent = '📞 Товарищ на связи!';
+      });
+      call.on('close', () => { remoteVideo.srcObject = null; statusDisplay.textContent = '🔴 Сеанс завершён.'; call = null; });
+      call.on('error', (err) => { statusDisplay.textContent = '❌ Ошибка звонка: ' + err.message; });
+    });
+
+    showCallBlock();
+    updateInviteUI();
+    startTimer();
+    statusDisplay.textContent = '⏳ Ожидаем подключения товарища...';
+    statusInit.textContent = 'Готов к связи';
+    startLifetimeTimer();
+
+  } catch (err) {
+    console.error(err);
+    statusInit.textContent = '❌ Ошибка: ' + err.message;
+  }
+}
+
+// ======================================================================
+// 11. ПРИСОЕДИНЕНИЕ К КОМНАТЕ
+// ======================================================================
+async function joinRoom(roomId, token) {
+  try {
+    if (!roomId || !token) {
+      statusInit.textContent = '❌ Введите ID и токен.';
+      return;
+    }
+    if (!isTokenValid(roomId, token)) {
+      statusInit.textContent = '❌ Недействительная ссылка. Попросите товарища обновить приглашение.';
+      return;
+    }
+    currentRoom = roomId;
+    isInitiator = false;
+
+    myKeyPair = generateKeyPair();
+
+    const stream = await getMedia();
+    localStream = stream;
+    if (hasVideo) localVideo.srcObject = stream;
+
+    peer = new Peer(PEER_OPTIONS);
+    await new Promise((resolve, reject) => {
+      peer.on('open', () => resolve());
+      peer.on('error', reject);
+    });
+
+    // DataConnection к комнате
+    conn = peer.connect(roomId);
+    conn.on('open', () => {
+      statusDisplay.textContent = '✅ Соединение с комнатой установлено.';
+      conn.send(JSON.stringify({ type: 'key', publicKey: myKeyPair.publicKey }));
+      loadHistoryFromFirestore();
+    });
+    conn.on('data', (data) => handleIncomingData(data));
+    conn.on('close', () => { conn = null; statusDisplay.textContent = '⚠️ Соединение чата разорвано.'; });
+
+    // Звонок
+    const callObj = peer.call(roomId, localStream);
+    call = callObj;
+    call.on('stream', (remote) => {
+      remoteStream = remote;
+      remoteVideo.srcObject = remote;
+      statusDisplay.textContent = '📞 Товарищ на связи!';
+    });
+    call.on('close', () => { remoteVideo.srcObject = null; statusDisplay.textContent = '🔴 Сеанс завершён.'; call = null; });
+    call.on('error', (err) => { statusDisplay.textContent = '❌ Ошибка звонка: ' + err.message; });
+
+    showCallBlock();
+    document.getElementById('inviteArea').classList.remove('active');
+    statusDisplay.textContent = '⏳ Устанавливаем соединение...';
+    statusInit.textContent = 'Готов к связи';
+
+  } catch (err) {
+    console.error(err);
+    statusInit.textContent = '❌ Ошибка: ' + err.message;
+  }
+}
+
+// ======================================================================
+// 12. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ (чат, ключи, файлы)
+// ======================================================================
+function handleIncomingData(data) {
+  try {
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    if (parsed.type === 'key') {
+      peerPublicKey = parsed.publicKey;
+      console.log('Получен публичный ключ собеседника');
+      return;
+    }
+    if (parsed.type === 'message') {
+      let decryptedContent = parsed.content;
+      // Если сообщение зашифровано, расшифровываем
+      if (parsed.encrypted && peerPublicKey) {
+        const decrypted = decryptMessage(parsed.encrypted, peerPublicKey, myKeyPair.secretKey);
+        if (decrypted) decryptedContent = decrypted;
+      }
+      addMessage(parsed.sender || 'Товарищ', decryptedContent, parsed.mediaType || 'text', parsed.timestamp);
+      return;
+    }
+    if (parsed.type === 'history') {
+      // игнорируем, так как историю берём из Firestore
+    }
+  } catch (e) {
+    console.warn('Ошибка обработки данных:', e);
+  }
+}
+
+// ======================================================================
+// 13. ОТПРАВКА СООБЩЕНИЯ (с шифрованием)
+// ======================================================================
+function sendMessage(text, mediaType = 'text', fileData = null) {
+  if (!conn) {
+    statusDisplay.textContent = '⚠️ Нет соединения для чата.';
+    return;
+  }
+  let content = fileData || text;
+  let encrypted = null;
+  // Шифруем, если есть публичный ключ собеседника
+  if (peerPublicKey) {
+    encrypted = encryptMessage(content, peerPublicKey, myKeyPair.secretKey);
+    content = ''; // в открытом виде не передаём
+  }
+  const msg = {
+    type: 'message',
+    sender: 'Я',
+    content: content,
+    mediaType: mediaType,
+    timestamp: Date.now(),
+    encrypted: encrypted
+  };
+  conn.send(JSON.stringify(msg));
+  addMessage('Я', fileData || text, mediaType, msg.timestamp);
+}
+
+// ======================================================================
+// 14. ТАЙМЕР ОБНОВЛЕНИЯ ТОКЕНА
+// ======================================================================
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  function update() {
     const now = Date.now();
-    for (const id in participants) {
-      const joined = participants[id].joinedAt;
-      if (joined) {
-        const joinedTime = joined.toDate ? joined.toDate().getTime() : new Date(joined).getTime();
-        if (now - joinedTime > 15000) {
-          // Если участник не обновлялся больше 15 секунд, удаляем его
-          participantsRef.doc(id).delete().catch(() => {});
-          delete participants[id];
-        }
-      }
-    }
-    const count = Object.keys(participants).length;
-    roomTitle.textContent = `Комната (${count})`;
-  });
-
-  unsubscribeMessages = messagesRef.orderBy('createdAt', 'asc').onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === 'added') {
-        const doc = change.doc;
-        if (!processedMsgIds.has(doc.id)) {
-          processedMsgIds.add(doc.id);
-          renderSingleMessage(doc.id, doc.data());
-        }
-      }
-    });
-  });
-
-  unsubscribeSignals = signalRef.where('target', '==', myUserId).onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === 'added') {
-        const data = change.doc.data();
-        change.doc.ref.delete().catch(() => {});
-        handleIncomingSignal(data);
-      }
-    });
-  });
-
-  // ---------- HEARTBEAT (каждые 5 секунд обновляем joinedAt) ----------
-  if (heartbeatInterval) clearInterval(heartbeatInterval);
-  heartbeatInterval = setInterval(() => {
-    if (participantsRef && myUserId) {
-      participantsRef.doc(myUserId).update({
-        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(() => {});
-    }
-  }, 5000);
-
-  // ---------- ОБРАБОТЧИК ЗАКРЫТИЯ ВКЛАДКИ ----------
-  window.addEventListener('beforeunload', () => {
-    if (participantsRef && myUserId) {
-      participantsRef.doc(myUserId).delete().catch(() => {});
-    }
-  });
-
-  window.location.hash = roomId;
-  home.style.display = 'none';
-  chat.style.display = 'flex';
-  msgInput.focus();
-}
-
-// ---------- ВЫХОД ИЗ КОМНАТЫ ----------
-function leaveRoom() {
-  if (participantsRef && myUserId) {
-    participantsRef.doc(myUserId).delete().catch(() => {});
+    const msInWindow = 300000;
+    const windowStart = Math.floor(now / msInWindow) * msInWindow;
+    const nextChange = windowStart + msInWindow;
+    const diff = nextChange - now;
+    if (diff <= 0) { updateInviteUI(); setTimeout(update, 100); return; }
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    timerDisplay.textContent = `(до смены: ${mins}:${secs.toString().padStart(2, '0')})`;
   }
-  if (unsubscribeMessages) unsubscribeMessages();
-  if (unsubscribeParticipants) unsubscribeParticipants();
-  if (unsubscribeSignals) unsubscribeSignals();
-  if (heartbeatInterval) clearInterval(heartbeatInterval);
-  processedMsgIds.clear();
-  participants = {};
-  roomId = '';
-  myUserId = '';
-  hangupCall();
-  home.style.display = 'flex';
-  chat.style.display = 'none';
-  window.location.hash = '';
+  update();
+  timerInterval = setInterval(update, 1000);
 }
-leaveRoomBtn.addEventListener('click', leaveRoom);
 
-createRoomBtn.addEventListener('click', () => {
-  const newRoomId = Math.random().toString(36).substring(2, 8);
-  enterRoom(newRoomId);
+function updateInviteUI() {
+  if (!currentRoom) return;
+  const token = generateToken(currentRoom, getCurrentWindow());
+  currentToken = token;
+  const link = buildInviteLink(currentRoom, token);
+  inviteLink.href = link;
+  inviteLink.textContent = link;
+}
+
+// ======================================================================
+// 15. ТАЙМЕР ЖИЗНИ КОМНАТЫ
+// ======================================================================
+function startLifetimeTimer() {
+  if (lifetimeTimer) clearTimeout(lifetimeTimer);
+  const lifetime = parseInt(document.getElementById('roomLifetime')?.value || 15) * 60000;
+  lifetimeTimer = setTimeout(() => {
+    statusDisplay.textContent = '⏰ Время комнаты истекло. Сеанс завершён.';
+    hangUp();
+  }, lifetime);
+}
+
+// ======================================================================
+// 16. ЗАВЕРШЕНИЕ ЗВОНКА
+// ======================================================================
+function hangUp() {
+  if (call) call.close();
+  if (conn) conn.close();
+  if (peer) peer.destroy();
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+  hideCallBlock();
+  initBlock.style.display = 'block';
+  callBlock.style.display = 'none';
+  if (timerInterval) clearInterval(timerInterval);
+  if (lifetimeTimer) clearTimeout(lifetimeTimer);
+  chatMessages.innerHTML = '';
+  messages = [];
+  currentRoom = null;
+}
+
+// ======================================================================
+// 17. ОБРАБОТЧИКИ ИНТЕРФЕЙСА
+// ======================================================================
+createRoomBtn.addEventListener('click', createRoom);
+
+joinRoomBtn.addEventListener('click', () => {
+  joinPanel.style.display = joinPanel.style.display === 'none' ? 'flex' : 'none';
 });
+
+doJoinBtn.addEventListener('click', () => {
+  const room = roomInput.value.trim();
+  const token = tokenInput.value.trim();
+  joinRoom(room, token);
+});
+
+testDeviceBtn.addEventListener('click', testDevices);
+
+toggleAudioBtn.addEventListener('click', () => {
+  if (localStream) {
+    const tracks = localStream.getAudioTracks();
+    if (tracks.length) {
+      const en = !tracks[0].enabled;
+      tracks[0].enabled = en;
+      toggleAudioBtn.textContent = en ? '🔇 Заглушить' : '🔊 Включить';
+    }
+  }
+});
+
+toggleVideoBtn.addEventListener('click', () => {
+  if (localStream) {
+    const tracks = localStream.getVideoTracks();
+    if (tracks.length) {
+      const en = !tracks[0].enabled;
+      tracks[0].enabled = en;
+      toggleVideoBtn.textContent = en ? '📷 Выключить' : '📷 Включить';
+    }
+  }
+});
+
+hangupBtn.addEventListener('click', hangUp);
 
 copyLinkBtn.addEventListener('click', () => {
-  const link = `${window.location.origin}${window.location.pathname}#${roomId}`;
-  navigator.clipboard.writeText(link).then(() => alert('Ссылка скопирована!'));
-});
-
-// ============================ ОТРИСОВКА СООБЩЕНИЙ ============================
-function renderSingleMessage(id, msg) {
-  const isOwn = msg.senderId === myUserId;
-  const div = document.createElement('div');
-  div.className = `msg ${isOwn ? 'msg-sent' : 'msg-received'}`;
-
-  const nameSpan = document.createElement('div');
-  nameSpan.className = 'msg-name';
-  nameSpan.textContent = isOwn ? 'Вы' : (msg.senderName || 'Участник');
-  div.appendChild(nameSpan);
-
-  const content = msg.content || '';
-
-  if (msg.type === 'audio') {
-    const container = document.createElement('div');
-    container.className = 'msg-audio';
-    const audio = document.createElement('audio');
-    audio.controls = true;
-    audio.src = content;
-    container.appendChild(audio);
-    div.appendChild(container);
-  } else if (msg.type === 'photo') {
-    const img = document.createElement('img');
-    img.src = content;
-    img.style.maxWidth = '200px';
-    img.style.borderRadius = '12px';
-    div.appendChild(img);
-  } else {
-    const textSpan = document.createElement('div');
-    textSpan.textContent = content;
-    div.appendChild(textSpan);
-  }
-
-  const timeSpan = document.createElement('div');
-  timeSpan.className = 'msg-time';
-  timeSpan.textContent = formatTime(msg.createdAt);
-  div.appendChild(timeSpan);
-
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-
-// ============================ ОТПРАВКА СООБЩЕНИЙ ============================
-async function sendTextMessage(text) {
-  if (!text.trim() || !roomId) return;
-  await messagesRef.add({
-    senderId: myUserId,
-    senderName: myName,
-    content: text,
-    type: 'text',
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  msgInput.value = '';
-  emojiPicker.style.display = 'none';
-  msgInput.focus();
-}
-
-async function sendMediaMessage(base64Data, type) {
-  if (!roomId) return;
-  if (base64Data.length > 900000) {
-    alert('Файл слишком большой для Firestore.');
-    return;
-  }
-  await messagesRef.add({
-    senderId: myUserId,
-    senderName: myName,
-    content: base64Data,
-    type: type,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-}
-
-sendBtn.addEventListener('click', () => sendTextMessage(msgInput.value));
-msgInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendTextMessage(msgInput.value); });
-
-emojiBtn.addEventListener('click', () => {
-  emojiPicker.style.display = emojiPicker.style.display === 'flex' ? 'none' : 'flex';
-});
-emojiPicker.addEventListener('click', e => {
-  if (e.target.tagName === 'SPAN') {
-    msgInput.value += e.target.textContent;
-    msgInput.focus();
+  const link = inviteLink.href;
+  if (link) {
+    navigator.clipboard.writeText(link).then(() => {
+      statusDisplay.textContent = '✅ Ссылка скопирована!';
+    }).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = link;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      statusDisplay.textContent = '✅ Ссылка скопирована!';
+    });
   }
 });
 
-// ============================ ГОЛОСОВЫЕ ============================
-recordBtn.addEventListener('click', async () => {
-  if (isRecording) {
-    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-    isRecording = false;
-    recordBtn.textContent = '🎤';
-    return;
+refreshLinkBtn.addEventListener('click', () => {
+  updateInviteUI();
+  statusDisplay.textContent = '🔄 Ссылка обновлена!';
+});
+
+sendChatBtn.addEventListener('click', () => {
+  const text = chatInput.value.trim();
+  if (text) {
+    sendMessage(text);
+    chatInput.value = '';
   }
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } });
-    mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 24000 });
-    audioChunks = [];
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(audioChunks, { type: 'audio/webm' });
-      const reader = new FileReader();
-      reader.onload = () => sendMediaMessage(reader.result, 'audio');
-      reader.readAsDataURL(blob);
-      stream.getTracks().forEach(t => t.stop());
+});
+
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendChatBtn.click();
+});
+
+fileInput.addEventListener('change', (e) => {
+  const files = e.target.files;
+  for (let file of files) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result;
+      let mediaType = 'image';
+      if (file.type.startsWith('video/')) mediaType = 'video';
+      sendMessage(base64, mediaType);
     };
-    mediaRecorder.start();
-    isRecording = true;
-    recordBtn.textContent = '⏹️';
-  } catch (e) {
-    alert('Микрофон недоступен');
+    reader.readAsDataURL(file);
   }
+  fileInput.value = '';
 });
 
-// ============================ СЕЛФИ ============================
-selfieBtn.addEventListener('click', async () => {
-  try {
-    selfieStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 320 } },
-      audio: false
-    });
-    selfieVideo.srcObject = selfieStream;
-    selfieModal.style.display = 'flex';
-  } catch (e) {
-    alert('Не удалось получить доступ к камере.');
-  }
-});
-
-closeSelfieBtn.addEventListener('click', closeSelfie);
-
-function closeSelfie() {
-  if (selfieStream) {
-    selfieStream.getTracks().forEach(t => t.stop());
-    selfieStream = null;
-  }
-  selfieModal.style.display = 'none';
-}
-
-takeSelfieBtn.addEventListener('click', () => {
-  if (!selfieStream) return;
-  const canvas = document.createElement('canvas');
-  canvas.width = 320;
-  canvas.height = 320;
-  const ctx = canvas.getContext('2d');
-  ctx.translate(canvas.width, 0);
-  ctx.scale(-1, 1);
-  ctx.drawImage(selfieVideo, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-  sendMediaMessage(dataUrl, 'photo');
-  closeSelfie();
-});
-
-// ============================ ЗВОНКИ (как в предыдущей версии) ============================
-document.querySelectorAll('.call-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const idx = parseInt(btn.dataset.config);
-    const config = callConfigs[idx];
-    console.log(`📞 Аудиозвонок #${idx+1}: ${config.name}`);
-    startCall(true, false, idx);
-  });
-});
-
-videoCallBtn.addEventListener('click', () => {
-  console.log('📹 Видеозвонок (конфиг #0)');
-  startCall(true, true, 0);
-});
-
-function startCall(isInitiator, wantVideo, configIndex) {
-  const targetId = Object.keys(participants).find(id => id !== myUserId);
-  if (!targetId) {
-    alert('Нет второго участника в комнате!');
-    return;
-  }
-  startPeerConnection(isInitiator, targetId, wantVideo, null, configIndex);
-}
-
-async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomingSignal = null, configIndex = 0) {
-  if (peer) hangupCall();
-  const config = callConfigs[configIndex] || callConfigs[0];
-  console.log(`🔧 Используется конфигурация: ${config.name}, trickle: ${config.trickle}`);
-
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: wantVideo ? { width: 480, height: 360 } : false
-    });
-  } catch (e) {
-    alert('Ошибка доступа к камере/микрофону');
-    return;
-  }
-
-  localVideo.srcObject = localStream;
-
-  peer = new SimplePeer({
-    initiator: isInitiator,
-    trickle: config.trickle,
-    stream: localStream,
-    config: { iceServers: config.iceServers }
-  });
-
-  peer.on('signal', signal => {
-    signalRef.add({
-      from: myUserId,
-      fromName: myName,
-      target: targetUserId,
-      callType: wantVideo ? 'video' : 'audio',
-      configIndex: configIndex,
-      signal: signal,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  });
-
-  peer.on('stream', rStream => {
-    remoteVideo.srcObject = rStream;
-    remoteAudio.srcObject = rStream;
-    remoteVideo.play().catch(() => {});
-    remoteAudio.play().catch(() => {});
-  });
-
-  peer.on('error', err => {
-    console.error('Peer error:', err);
-    hangupCall();
-  });
-  peer.on('close', () => hangupCall());
-
-  if (incomingSignal) peer.signal(incomingSignal);
-
-  isCallActive = true;
-  callContainer.style.display = 'flex';
-  callInfo.textContent = isInitiator ? 'Звоним собеседнику...' : 'Идет разговор';
-}
-
-function hangupCall() {
-  isCallActive = false;
-  pendingCallData = null;
-  if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
-  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-  remoteVideo.srcObject = null;
-  remoteAudio.srcObject = null;
-  localVideo.srcObject = null;
-  callContainer.style.display = 'none';
-}
-
-hangupBtn.addEventListener('click', hangupCall);
-
-function handleIncomingSignal(data) {
-  const { signal, from, fromName, callType, configIndex } = data;
-  if (!isCallActive && !peer) {
-    pendingCallData = { from, fromName, callType, configIndex: configIndex || 0, signal };
-    const isVideo = callType === 'video';
-    incomingCallText.textContent = `Входящий ${isVideo ? 'видеозвонок' : 'аудиозвонок'} от ${fromName || 'участника'}`;
-    incomingCallModal.style.display = 'flex';
-  } else if (peer) {
-    try { peer.signal(signal); } catch(e) {}
-  }
-}
-
-acceptCallBtn.addEventListener('click', () => {
-  incomingCallModal.style.display = 'none';
-  if (pendingCallData) {
-    const { from, callType, configIndex, signal } = pendingCallData;
-    startPeerConnection(false, from, callType === 'video', signal, configIndex);
-    pendingCallData = null;
-  }
-});
-
-rejectCallBtn.addEventListener('click', () => {
-  incomingCallModal.style.display = 'none';
-  pendingCallData = null;
-});
-
-// ============================ АВТО-ВХОД ============================
+// ======================================================================
+// 18. АВТОМАТИЧЕСКИЙ ВХОД ПО ССЫЛКЕ
+// ======================================================================
 window.addEventListener('load', () => {
-  const hash = window.location.hash.replace('#', '').trim();
-  if (hash) {
-    enterRoom(hash);
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room');
+  const token = params.get('token');
+  if (room && token) {
+    setTimeout(() => joinRoom(room, token), 500);
   }
 });
+
+console.log('Secure Chat загружен. Создайте комнату или присоединитесь по ссылке.');
 </script>
 </body>
 </html>
