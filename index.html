@@ -13,7 +13,6 @@
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
   <style>
-    /* ---------- Стили (современный тёмный дизайн) ---------- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -107,7 +106,6 @@
       background: #111;
       display: block;
     }
-    /* Зеркальное отображение для локального видео */
     #localVideo { transform: scaleX(-1); }
     .video-box .label {
       position: absolute;
@@ -128,7 +126,7 @@
     }
     .chat-area.active { display: block; }
     .chat-messages {
-      max-height: 200px;
+      max-height: 300px; /* Увеличили высоту */
       overflow-y: auto;
       background: rgba(0,0,0,0.3);
       border-radius: 12px;
@@ -204,7 +202,8 @@
     }
     .invite-area.active { display: block; }
     .invite-area .link-label { font-weight: bold; color: #3b82f6; }
-    .invite-area a { color: #60a5fa; text-decoration: underline; }
+    /* Скрываем саму ссылку, оставляем только кнопку */
+    .invite-area .link-url { display: none; }
     .timer { color: #facc15; font-weight: bold; }
     .status {
       text-align: center;
@@ -262,9 +261,35 @@
     }
     .input-field::placeholder { color: #64748b; }
 
-    /* Блок начального меню */
     .block-init { display: block; }
     .block-call { display: none; }
+
+    /* Панель эмодзи */
+    .emoji-picker {
+      display: none;
+      padding: 8px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .emoji-picker.active { display: flex; }
+    .emoji-picker span {
+      font-size: 1.8rem;
+      cursor: pointer;
+      transition: transform 0.1s;
+      padding: 4px;
+      border-radius: 8px;
+    }
+    .emoji-picker span:hover { background: #334155; transform: scale(1.2); }
+
+    .exit-btn-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
 
     @media (max-width: 600px) {
       .header h1 { font-size: 1.8rem; }
@@ -323,8 +348,18 @@
     </div>
 
     <div class="chat-area" id="chatArea">
+      <!-- Панель смайликов -->
+      <div class="emoji-picker" id="emojiPicker">
+        <span>😀</span><span>😂</span><span>😍</span><span>👍</span><span>❤️</span>
+        <span>🔥</span><span>🎉</span><span>😎</span><span>🙏</span><span>💩</span>
+        <span>🙈</span><span>🚀</span><span>🤔</span><span>😊</span><span>👋</span>
+        <span>👀</span><span>🤣</span><span>🥳</span><span>💪</span><span>✨</span>
+        <span>🌟</span><span>⭐</span><span>🌙</span><span>☀️</span><span>⚡</span>
+        <span>❄️</span><span>🔥</span><span>💧</span><span>🌊</span><span>🌈</span>
+      </div>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-input-row">
+        <button class="btn btn-secondary btn-sm" id="emojiToggleBtn">😀</button>
         <input type="text" id="chatInput" placeholder="Введите сообщение..." />
         <button class="btn btn-sm" id="sendChatBtn">Отправить</button>
         <div class="file-input-wrapper">
@@ -335,10 +370,10 @@
     </div>
 
     <div class="invite-area" id="inviteArea">
-      <div><span class="link-label">🔗 Пригласительная ссылка (действительна 5 мин):</span></div>
-      <div><a id="inviteLink" href="#" target="_blank">Ссылка</a></div>
+      <div><span class="link-label">🔗 Пригласительная ссылка:</span></div>
+      <div class="link-url"><a id="inviteLink" href="#" target="_blank">Ссылка</a></div>
       <div class="flex-row" style="gap:8px; margin-top:6px;">
-        <button class="btn btn-secondary btn-sm" id="copyLinkBtn">📋 Копировать</button>
+        <button class="btn btn-secondary btn-sm" id="copyLinkBtn">📋 Копировать ссылку</button>
         <button class="btn btn-secondary btn-sm" id="refreshLinkBtn">🔄 Обновить</button>
       </div>
       <div style="font-size:0.85rem; color:#94a3b8; margin-top:4px;">
@@ -348,6 +383,11 @@
     </div>
 
     <div class="status" id="statusDisplay">⏳ Ожидание соединения...</div>
+
+    <!-- Кнопка выхода -->
+    <div class="exit-btn-wrapper">
+      <button class="btn btn-danger btn-sm" id="exitRoomBtn">🚪 Выйти из комнаты</button>
+    </div>
   </div>
 </div>
 
@@ -463,8 +503,8 @@ function buildInviteLink(roomId, token) {
 let currentRoom = null;
 let currentToken = null;
 let peer = null;
-let conn = null;          // DataConnection
-let call = null;          // MediaConnection
+let conn = null;
+let call = null;
 let localStream = null;
 let remoteStream = null;
 let isInitiator = false;
@@ -475,7 +515,7 @@ let messages = [];
 let hasVideo = false;
 let hasAudio = false;
 let myKeyPair = null;
-let peerPublicKey = null; // публичный ключ собеседника (для шифрования)
+let peerPublicKey = null;
 
 // DOM элементы
 const initBlock = document.getElementById('initBlock');
@@ -502,6 +542,9 @@ const toggleVideoBtn = document.getElementById('toggleVideoBtn');
 const hangupBtn = document.getElementById('hangupBtn');
 const copyLinkBtn = document.getElementById('copyLinkBtn');
 const refreshLinkBtn = document.getElementById('refreshLinkBtn');
+const exitRoomBtn = document.getElementById('exitRoomBtn');
+const emojiToggleBtn = document.getElementById('emojiToggleBtn');
+const emojiPicker = document.getElementById('emojiPicker');
 
 // ======================================================================
 // 6. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -519,7 +562,6 @@ function addMessage(sender, content, mediaType = 'text', timestamp = Date.now())
   div.innerHTML = `<span class="sender">${sender}</span> <span class="time">${timeStr}</span><br>${displayContent}`;
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
-  // Сохраняем в Firestore (если есть комната)
   if (currentRoom) {
     db.collection('rooms').doc(currentRoom).collection('messages').add({
       sender,
@@ -591,9 +633,10 @@ async function getMedia() {
 }
 
 // ======================================================================
-// 9. ПОКАЗАТЬ/СКРЫТЬ БЛОК ЗВОНКА
+// 9. ПОКАЗАТЬ/СКРЫТЬ БЛОКИ
 // ======================================================================
 function showCallBlock() {
+  initBlock.style.display = 'none'; // скрываем главное меню
   callBlock.style.display = 'block';
   document.getElementById('videoGrid').classList.add('active');
   document.getElementById('callControls').classList.add('active');
@@ -608,6 +651,7 @@ function showCallBlock() {
   }
 }
 function hideCallBlock() {
+  initBlock.style.display = 'block'; // показываем главное меню при выходе
   callBlock.style.display = 'none';
   document.getElementById('videoGrid').classList.remove('active');
   document.getElementById('callControls').classList.remove('active');
@@ -627,7 +671,6 @@ async function createRoom() {
     currentRoom = roomId;
     isInitiator = true;
 
-    // Генерируем ключи шифрования
     myKeyPair = generateKeyPair();
 
     const stream = await getMedia();
@@ -640,13 +683,11 @@ async function createRoom() {
       peer.on('error', reject);
     });
 
-    // Обработка входящих DataConnection
     peer.on('connection', (dataConn) => {
       if (conn) { dataConn.close(); return; }
       conn = dataConn;
       conn.on('open', () => {
         statusDisplay.textContent = '✅ Соединение для чата установлено!';
-        // Отправляем свой публичный ключ
         conn.send(JSON.stringify({ type: 'key', publicKey: myKeyPair.publicKey }));
         loadHistoryFromFirestore();
       });
@@ -654,7 +695,6 @@ async function createRoom() {
       conn.on('close', () => { conn = null; statusDisplay.textContent = '⚠️ Соединение чата разорвано.'; });
     });
 
-    // Обработка входящих звонков
     peer.on('call', (incomingCall) => {
       if (call) { incomingCall.answer(); return; }
       call = incomingCall;
@@ -709,7 +749,6 @@ async function joinRoom(roomId, token) {
       peer.on('error', reject);
     });
 
-    // DataConnection к комнате
     conn = peer.connect(roomId);
     conn.on('open', () => {
       statusDisplay.textContent = '✅ Соединение с комнатой установлено.';
@@ -719,7 +758,6 @@ async function joinRoom(roomId, token) {
     conn.on('data', (data) => handleIncomingData(data));
     conn.on('close', () => { conn = null; statusDisplay.textContent = '⚠️ Соединение чата разорвано.'; });
 
-    // Звонок
     const callObj = peer.call(roomId, localStream);
     call = callObj;
     call.on('stream', (remote) => {
@@ -742,7 +780,7 @@ async function joinRoom(roomId, token) {
 }
 
 // ======================================================================
-// 12. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ (чат, ключи, файлы)
+// 12. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ
 // ======================================================================
 function handleIncomingData(data) {
   try {
@@ -754,16 +792,12 @@ function handleIncomingData(data) {
     }
     if (parsed.type === 'message') {
       let decryptedContent = parsed.content;
-      // Если сообщение зашифровано, расшифровываем
       if (parsed.encrypted && peerPublicKey) {
         const decrypted = decryptMessage(parsed.encrypted, peerPublicKey, myKeyPair.secretKey);
         if (decrypted) decryptedContent = decrypted;
       }
       addMessage(parsed.sender || 'Товарищ', decryptedContent, parsed.mediaType || 'text', parsed.timestamp);
       return;
-    }
-    if (parsed.type === 'history') {
-      // игнорируем, так как историю берём из Firestore
     }
   } catch (e) {
     console.warn('Ошибка обработки данных:', e);
@@ -780,10 +814,9 @@ function sendMessage(text, mediaType = 'text', fileData = null) {
   }
   let content = fileData || text;
   let encrypted = null;
-  // Шифруем, если есть публичный ключ собеседника
   if (peerPublicKey) {
     encrypted = encryptMessage(content, peerPublicKey, myKeyPair.secretKey);
-    content = ''; // в открытом виде не передаём
+    content = '';
   }
   const msg = {
     type: 'message',
@@ -831,17 +864,17 @@ function updateInviteUI() {
 // ======================================================================
 function startLifetimeTimer() {
   if (lifetimeTimer) clearTimeout(lifetimeTimer);
-  const lifetime = parseInt(document.getElementById('roomLifetime')?.value || 15) * 60000;
+  const lifetime = 15 * 60000; // 15 минут
   lifetimeTimer = setTimeout(() => {
     statusDisplay.textContent = '⏰ Время комнаты истекло. Сеанс завершён.';
-    hangUp();
+    exitRoom();
   }, lifetime);
 }
 
 // ======================================================================
-// 16. ЗАВЕРШЕНИЕ ЗВОНКА
+// 16. ВЫХОД ИЗ КОМНАТЫ
 // ======================================================================
-function hangUp() {
+function exitRoom() {
   if (call) call.close();
   if (conn) conn.close();
   if (peer) peer.destroy();
@@ -852,13 +885,14 @@ function hangUp() {
   remoteVideo.srcObject = null;
   localVideo.srcObject = null;
   hideCallBlock();
-  initBlock.style.display = 'block';
-  callBlock.style.display = 'none';
   if (timerInterval) clearInterval(timerInterval);
   if (lifetimeTimer) clearTimeout(lifetimeTimer);
   chatMessages.innerHTML = '';
   messages = [];
   currentRoom = null;
+  peerPublicKey = null;
+  statusDisplay.textContent = '';
+  statusInit.textContent = 'Вы вышли из комнаты.';
 }
 
 // ======================================================================
@@ -900,7 +934,7 @@ toggleVideoBtn.addEventListener('click', () => {
   }
 });
 
-hangupBtn.addEventListener('click', hangUp);
+hangupBtn.addEventListener('click', exitRoom);
 
 copyLinkBtn.addEventListener('click', () => {
   const link = inviteLink.href;
@@ -923,6 +957,8 @@ refreshLinkBtn.addEventListener('click', () => {
   updateInviteUI();
   statusDisplay.textContent = '🔄 Ссылка обновлена!';
 });
+
+exitRoomBtn.addEventListener('click', exitRoom);
 
 sendChatBtn.addEventListener('click', () => {
   const text = chatInput.value.trim();
@@ -949,6 +985,19 @@ fileInput.addEventListener('change', (e) => {
     reader.readAsDataURL(file);
   }
   fileInput.value = '';
+});
+
+// Эмодзи
+emojiToggleBtn.addEventListener('click', () => {
+  emojiPicker.classList.toggle('active');
+});
+
+emojiPicker.addEventListener('click', (e) => {
+  if (e.target.tagName === 'SPAN') {
+    chatInput.value += e.target.textContent;
+    chatInput.focus();
+    emojiPicker.classList.remove('active');
+  }
 });
 
 // ======================================================================
