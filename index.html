@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Chat App - 5 новых звонков</title>
+  <title>Chat App - стабильный</title>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <!-- simple-peer -->
   <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
   <style>
-    /* (стили те же, что и раньше, без изменений) */
+    /* === Стили без изменений (те же, что и в прошлой версии) === */
     :root {
       --bg-body: #0f172a;
       --bg-app: #1e293b;
@@ -278,8 +278,8 @@
 <body>
 <div id="app">
   <div id="home">
-    <h1>📱 Chat Test</h1>
-    <p>5 новых аудиозвонков</p>
+    <h1>📱 Chat</h1>
+    <p>Стабильное присутствие</p>
     <button class="btn" id="createRoomBtn">➕ Создать комнату</button>
   </div>
 
@@ -288,7 +288,7 @@
       <h2 id="roomTitle">Комната</h2>
       <div id="header-actions">
         <button id="copyLinkBtn" title="Скопировать ссылку">🔗</button>
-        <!-- 5 новых кнопок -->
+        <!-- 5 кнопок для аудиозвонков -->
         <button class="call-btn" data-config="0">📞1</button>
         <button class="call-btn" data-config="1">📞2</button>
         <button class="call-btn" data-config="2">📞3</button>
@@ -370,8 +370,9 @@ let participants = {};
 let peer = null, localStream = null, isCallActive = false, pendingCallData = null;
 let mediaRecorder = null, audioChunks = [], isRecording = false;
 let selfieStream = null;
+let heartbeatInterval = null;
 
-// DOM
+// DOM (как и раньше)
 const home = document.getElementById('home');
 const chat = document.getElementById('chat');
 const messagesDiv = document.getElementById('messages');
@@ -404,56 +405,13 @@ const selfieVideo = document.getElementById('selfie-video');
 const takeSelfieBtn = document.getElementById('takeSelfieBtn');
 const closeSelfieBtn = document.getElementById('closeSelfieBtn');
 
-// ============================ НОВЫЕ 5 КОНФИГУРАЦИЙ ============================
+// ============================ КОНФИГУРАЦИИ ЗВОНКОВ ============================
 const callConfigs = [
-  {
-    name: 'Максимум STUN',
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.ekiga.net' },
-      { urls: 'stun:global.stun.twilio.com:3478' }
-    ],
-    trickle: true
-  },
-  {
-    name: 'TURN OpenRelay',
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'turn:openrelay.metered.ca:80' },
-      { urls: 'turn:openrelay.metered.ca:443' },
-      { urls: 'turn:openrelay.metered.ca:3478' }
-    ],
-    trickle: true
-  },
-  {
-    name: 'TURN Twilio (бесплатный)',
-    iceServers: [
-      { urls: 'stun:global.stun.twilio.com:3478' },
-      { urls: 'turn:global.turn.twilio.com:3478?transport=udp' },
-      { urls: 'turn:global.turn.twilio.com:3478?transport=tcp' }
-    ],
-    trickle: true
-  },
-  {
-    name: 'TURN Metered.ca',
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'turn:turn.metered.ca:80' },
-      { urls: 'turn:turn.metered.ca:443' },
-      { urls: 'turn:turn.metered.ca:3478' }
-    ],
-    trickle: true
-  },
-  {
-    name: 'Комбо + trickle:false',
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:global.stun.twilio.com:3478' },
-      { urls: 'turn:openrelay.metered.ca:3478' }
-    ],
-    trickle: false
-  }
+  { name: 'Макс STUN', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.ekiga.net' }, { urls: 'stun:global.stun.twilio.com:3478' }], trickle: true },
+  { name: 'TURN OpenRelay', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80' }, { urls: 'turn:openrelay.metered.ca:443' }, { urls: 'turn:openrelay.metered.ca:3478' }], trickle: true },
+  { name: 'TURN Twilio', iceServers: [{ urls: 'stun:global.stun.twilio.com:3478' }, { urls: 'turn:global.turn.twilio.com:3478?transport=udp' }, { urls: 'turn:global.turn.twilio.com:3478?transport=tcp' }], trickle: true },
+  { name: 'TURN Metered', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:turn.metered.ca:80' }, { urls: 'turn:turn.metered.ca:443' }, { urls: 'turn:turn.metered.ca:3478' }], trickle: true },
+  { name: 'Комбо + trickle:false', iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' }, { urls: 'turn:openrelay.metered.ca:3478' }], trickle: false }
 ];
 
 // ============================ ВСПОМОГАТЕЛЬНЫЕ ============================
@@ -462,7 +420,17 @@ function generateRandomName() {
   const nouns = ['Лис', 'Волк', 'Заяц', 'Сокол', 'Дельфин', 'Тигр'];
   return adjs[Math.floor(Math.random() * adjs.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
 }
-function generateUserId() { return 'usr_' + Math.random().toString(36).substring(2, 9); }
+
+function getUserId() {
+  // Сохраняем userId в sessionStorage, чтобы при перезагрузке использовать тот же
+  let id = sessionStorage.getItem('chatUserId');
+  if (!id) {
+    id = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    sessionStorage.setItem('chatUserId', id);
+  }
+  return id;
+}
+
 function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -472,7 +440,7 @@ function formatTime(timestamp) {
 // ============================ ВХОД / ВЫХОД ============================
 async function enterRoom(roomIdParam) {
   roomId = roomIdParam;
-  myUserId = generateUserId();
+  myUserId = getUserId();
   myName = generateRandomName();
 
   roomRef = db.collection('rooms').doc(roomId);
@@ -480,12 +448,53 @@ async function enterRoom(roomIdParam) {
   participantsRef = roomRef.collection('participants');
   signalRef = roomRef.collection('signals');
 
-  await participantsRef.doc(myUserId).set({ name: myName, joinedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  // ---------- ОЧИСТКА СТАРЫХ УЧАСТНИКОВ ----------
+  // Удаляем всех участников, у которых joinedAt старше 10 секунд (они "умерли")
+  const tenSecondsAgo = new Date(Date.now() - 10000);
+  const oldParticipants = await participantsRef
+    .where('joinedAt', '<', tenSecondsAgo)
+    .get();
+  const batch = db.batch();
+  oldParticipants.forEach(doc => batch.delete(doc.ref));
+  await batch.commit();
 
+  // ---------- ОБНОВЛЕНИЕ / СОЗДАНИЕ УЧАСТНИКА ----------
+  // Проверяем, есть ли уже участник с таким userId (перезагрузка)
+  const existing = await participantsRef.doc(myUserId).get();
+  if (existing.exists) {
+    // Обновляем время
+    await participantsRef.doc(myUserId).update({
+      name: myName,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } else {
+    await participantsRef.doc(myUserId).set({
+      name: myName,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  // ---------- ПОДПИСКИ ----------
   unsubscribeParticipants = participantsRef.onSnapshot(snapshot => {
     participants = {};
-    snapshot.forEach(doc => { participants[doc.id] = doc.data(); });
-    roomTitle.textContent = `Комната (${Object.keys(participants).length})`;
+    snapshot.forEach(doc => {
+      participants[doc.id] = doc.data();
+    });
+    // Убираем "мёртвых" участников из списка (хотя они уже удалены, но на всякий случай)
+    const now = Date.now();
+    for (const id in participants) {
+      const joined = participants[id].joinedAt;
+      if (joined) {
+        const joinedTime = joined.toDate ? joined.toDate().getTime() : new Date(joined).getTime();
+        if (now - joinedTime > 15000) {
+          // Если участник не обновлялся больше 15 секунд, удаляем его
+          participantsRef.doc(id).delete().catch(() => {});
+          delete participants[id];
+        }
+      }
+    }
+    const count = Object.keys(participants).length;
+    roomTitle.textContent = `Комната (${count})`;
   });
 
   unsubscribeMessages = messagesRef.orderBy('createdAt', 'asc').onSnapshot(snapshot => {
@@ -510,40 +519,60 @@ async function enterRoom(roomIdParam) {
     });
   });
 
+  // ---------- HEARTBEAT (каждые 5 секунд обновляем joinedAt) ----------
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(() => {
+    if (participantsRef && myUserId) {
+      participantsRef.doc(myUserId).update({
+        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(() => {});
+    }
+  }, 5000);
+
+  // ---------- ОБРАБОТЧИК ЗАКРЫТИЯ ВКЛАДКИ ----------
+  window.addEventListener('beforeunload', () => {
+    if (participantsRef && myUserId) {
+      participantsRef.doc(myUserId).delete().catch(() => {});
+    }
+  });
+
   window.location.hash = roomId;
   home.style.display = 'none';
   chat.style.display = 'flex';
   msgInput.focus();
 }
 
-window.addEventListener('beforeunload', () => {
-  if (participantsRef && myUserId) participantsRef.doc(myUserId).delete();
-});
-
+// ---------- ВЫХОД ИЗ КОМНАТЫ ----------
 function leaveRoom() {
-  if (participantsRef && myUserId) participantsRef.doc(myUserId).delete().catch(() => {});
+  if (participantsRef && myUserId) {
+    participantsRef.doc(myUserId).delete().catch(() => {});
+  }
   if (unsubscribeMessages) unsubscribeMessages();
   if (unsubscribeParticipants) unsubscribeParticipants();
   if (unsubscribeSignals) unsubscribeSignals();
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
   processedMsgIds.clear();
   participants = {};
-  roomId = ''; myUserId = '';
+  roomId = '';
+  myUserId = '';
   hangupCall();
   home.style.display = 'flex';
   chat.style.display = 'none';
   window.location.hash = '';
 }
 leaveRoomBtn.addEventListener('click', leaveRoom);
+
 createRoomBtn.addEventListener('click', () => {
   const newRoomId = Math.random().toString(36).substring(2, 8);
   enterRoom(newRoomId);
 });
+
 copyLinkBtn.addEventListener('click', () => {
   const link = `${window.location.origin}${window.location.pathname}#${roomId}`;
   navigator.clipboard.writeText(link).then(() => alert('Ссылка скопирована!'));
 });
 
-// ============================ ОТРИСОВКА ============================
+// ============================ ОТРИСОВКА СООБЩЕНИЙ ============================
 function renderSingleMessage(id, msg) {
   const isOwn = msg.senderId === myUserId;
   const div = document.createElement('div');
@@ -585,7 +614,7 @@ function renderSingleMessage(id, msg) {
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// ============================ ОТПРАВКА ============================
+// ============================ ОТПРАВКА СООБЩЕНИЙ ============================
 async function sendTextMessage(text) {
   if (!text.trim() || !roomId) return;
   await messagesRef.add({
@@ -694,24 +723,21 @@ takeSelfieBtn.addEventListener('click', () => {
   closeSelfie();
 });
 
-// ============================ ЗВОНКИ (ОБНОВЛЁННЫЕ) ============================
-// Обработчики кнопок аудиозвонков с передачей индекса конфигурации
+// ============================ ЗВОНКИ (как в предыдущей версии) ============================
 document.querySelectorAll('.call-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const idx = parseInt(btn.dataset.config);
     const config = callConfigs[idx];
     console.log(`📞 Аудиозвонок #${idx+1}: ${config.name}`);
-    startCall(true, false, idx); // isInitiator=true, wantVideo=false
+    startCall(true, false, idx);
   });
 });
 
-// Видеозвонок использует конфигурацию #0 (максимум STUN)
 videoCallBtn.addEventListener('click', () => {
   console.log('📹 Видеозвонок (конфиг #0)');
   startCall(true, true, 0);
 });
 
-// Общая функция инициации звонка с передачей индекса конфига
 function startCall(isInitiator, wantVideo, configIndex) {
   const targetId = Object.keys(participants).find(id => id !== myUserId);
   if (!targetId) {
@@ -721,11 +747,8 @@ function startCall(isInitiator, wantVideo, configIndex) {
   startPeerConnection(isInitiator, targetId, wantVideo, null, configIndex);
 }
 
-// ============================ WEBRTC (ОБНОВЛЁННЫЙ) ============================
 async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomingSignal = null, configIndex = 0) {
   if (peer) hangupCall();
-
-  // Берём конфиг по индексу
   const config = callConfigs[configIndex] || callConfigs[0];
   console.log(`🔧 Используется конфигурация: ${config.name}, trickle: ${config.trickle}`);
 
@@ -749,13 +772,12 @@ async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomin
   });
 
   peer.on('signal', signal => {
-    // В сигнале передаём индекс конфигурации, чтобы отвечающий использовал ту же
     signalRef.add({
       from: myUserId,
       fromName: myName,
       target: targetUserId,
       callType: wantVideo ? 'video' : 'audio',
-      configIndex: configIndex,  // передаём индекс
+      configIndex: configIndex,
       signal: signal,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -794,19 +816,10 @@ function hangupCall() {
 
 hangupBtn.addEventListener('click', hangupCall);
 
-// ============================ ВХОДЯЩИЕ ЗВОНКИ ============================
 function handleIncomingSignal(data) {
   const { signal, from, fromName, callType, configIndex } = data;
-
   if (!isCallActive && !peer) {
-    // Сохраняем данные входящего звонка вместе с индексом конфига
-    pendingCallData = {
-      from,
-      fromName,
-      callType,
-      configIndex: configIndex || 0,  // если нет, используем 0
-      signal
-    };
+    pendingCallData = { from, fromName, callType, configIndex: configIndex || 0, signal };
     const isVideo = callType === 'video';
     incomingCallText.textContent = `Входящий ${isVideo ? 'видеозвонок' : 'аудиозвонок'} от ${fromName || 'участника'}`;
     incomingCallModal.style.display = 'flex';
@@ -819,7 +832,6 @@ acceptCallBtn.addEventListener('click', () => {
   incomingCallModal.style.display = 'none';
   if (pendingCallData) {
     const { from, callType, configIndex, signal } = pendingCallData;
-    // Отвечаем с той же конфигурацией
     startPeerConnection(false, from, callType === 'video', signal, configIndex);
     pendingCallData = null;
   }
@@ -833,7 +845,9 @@ rejectCallBtn.addEventListener('click', () => {
 // ============================ АВТО-ВХОД ============================
 window.addEventListener('load', () => {
   const hash = window.location.hash.replace('#', '').trim();
-  if (hash) enterRoom(hash);
+  if (hash) {
+    enterRoom(hash);
+  }
 });
 </script>
 </body>
