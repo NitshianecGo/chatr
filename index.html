@@ -2,1008 +2,199 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Secure Chat</title>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Простой Чат с Ссылкой</title>
+  <!-- Подключаем библиотека PeerJS -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #0a0f1a;
-      color: #e0e0e0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px;
-    }
-    #splashScreen {
-      position: fixed;
-      inset: 0;
-      background: radial-gradient(ellipse at center, #1a0f0a 0%, #0a0505 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      transition: opacity 1.2s ease;
-      font-family: 'Times New Roman', serif;
-    }
-    #splashScreen.hidden { opacity: 0; pointer-events: none; }
-    .splash-content {
-      text-align: center;
-      animation: fadeInUp 2s ease;
-      padding: 20px;
-    }
-    .splash-content .logo {
-      font-size: 5rem;
-      color: #d4af37;
-      text-shadow: 0 0 40px #b8860b, 0 0 80px #8b6508;
-      letter-spacing: 8px;
-      border: 3px double #b8860b;
-      padding: 20px 40px;
-      border-radius: 20px;
-      background: rgba(0,0,0,0.4);
-      display: inline-block;
-    }
-    .splash-content .logo span { display: block; font-size: 1.8rem; letter-spacing: 4px; margin-top: 8px; color: #b8860b; }
-    .splash-content .subtitle {
-      font-size: 1.6rem;
-      color: #d4af37;
-      margin-top: 20px;
-      text-shadow: 0 0 20px #8b6508;
-      border-top: 2px solid #b8860b;
-      border-bottom: 2px solid #b8860b;
-      padding: 8px 20px;
-      display: inline-block;
-      letter-spacing: 2px;
-    }
-    .splash-content .ornament { font-size: 3rem; color: #b8860b; margin: 10px 0; }
-    .splash-content .loading-bar {
-      width: 240px;
-      height: 4px;
-      background: #2a1a1a;
-      border-radius: 4px;
-      margin: 20px auto 0;
-      overflow: hidden;
-      border: 1px solid #b8860b;
-    }
-    .splash-content .loading-bar .fill {
-      height: 100%;
-      width: 0;
-      background: linear-gradient(90deg, #b8860b, #f5d742);
-      animation: load 2.5s ease-in-out forwards;
-    }
-    @keyframes load { 0% { width: 0; } 100% { width: 100%; } }
-    @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
+    * { box-sizing: border-box; font-family: sans-serif; margin: 0; padding: 0; }
+    body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f2f5; }
+    .chat-card { width: 100%; max-width: 450px; height: 600px; background: #fff; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
+    
+    /* Шапка */
+    .header { padding: 15px; background: #007bff; color: white; display: flex; justify-content: space-between; align-items: center; }
+    .header h3 { font-size: 18px; }
+    .call-btn { background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    .call-btn:hover { background: #218838; }
 
-    #app {
-      width: 100%;
-      max-width: 1100px;
-      background: rgba(20, 25, 40, 0.9);
-      border-radius: 30px;
-      padding: 20px 15px;
-      box-shadow: 0 0 60px rgba(59, 130, 246, 0.15);
-      border: 1px solid #2a3a5a;
-      backdrop-filter: blur(6px);
-      opacity: 0;
-      transition: opacity 1s ease;
-      position: relative;
-    }
-    #app.visible { opacity: 1; }
-    .header { text-align: center; margin-bottom: 15px; }
-    .header h1 { font-size: 2.2rem; font-weight: 700; color: #3b82f6; text-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
-    .header .subtitle { color: #94a3b8; font-size: 1rem; border-top: 1px solid #2a3a5a; border-bottom: 1px solid #2a3a5a; padding: 6px 0; }
-    .btn {
-      background: #3b82f6; border: none; color: white; font-weight: 600;
-      padding: 12px 24px; border-radius: 60px; cursor: pointer; transition: all 0.2s;
-      font-size: 1rem; display: inline-flex; align-items: center; gap: 8px;
-      box-shadow: 0 4px 0 #1e40af; touch-action: manipulation; min-height: 48px;
-    }
-    .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1e40af; }
-    .btn-secondary { background: #475569; box-shadow: 0 4px 0 #1e293b; }
-    .btn-success { background: #22c55e; box-shadow: 0 4px 0 #15803d; }
-    .btn-danger { background: #ef4444; box-shadow: 0 4px 0 #b91c1c; }
-    .btn-sm { padding: 8px 16px; font-size: 0.9rem; min-height: 40px; }
-    .flex-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0; }
-    .video-grid { display: none; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 15px 0; }
-    .video-grid.active { display: flex; }
-    .video-box {
-      flex: 1 1 200px; min-width: 140px; background: #0a0505; border: 2px solid #3b82f6;
-      border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 4/3; cursor: pointer;
-    }
-    .video-box video { width: 100%; height: 100%; object-fit: cover; background: #111; display: block; }
-    #localVideo { transform: scaleX(-1); }
-    .video-box .label {
-      position: absolute; bottom: 6px; left: 6px; background: rgba(0,0,0,0.7);
-      padding: 2px 12px; border-radius: 30px; font-size: 0.8rem; color: #f8fafc;
-      border: 1px solid #3b82f6; pointer-events: none;
-    }
-    .chat-area { display: none; margin-top: 15px; border-top: 1px solid #2a3a5a; padding-top: 12px; }
-    .chat-area.active { display: block; }
-    .chat-messages {
-      max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.3);
-      border-radius: 12px; padding: 8px; margin-bottom: 8px; border: 1px solid #2a3a5a;
-    }
-    .chat-messages .msg {
-      background: rgba(20, 30, 50, 0.6); border-radius: 10px; padding: 5px 10px;
-      margin-bottom: 5px; color: #e0e0e0; word-break: break-word; font-size: 0.95rem;
-    }
-    .chat-messages .msg .sender { color: #60a5fa; font-weight: bold; }
-    .chat-messages .msg .time { color: #94a3b8; font-size: 0.7rem; margin-left: 8px; }
-    .chat-messages .msg img, .chat-messages .msg video {
-      max-width: 120px; border-radius: 8px; margin-top: 4px; border: 1px solid #3b82f6;
-    }
-    .chat-input-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chat-input-row input[type="text"] {
-      flex: 1; background: #0f172a; border: 1px solid #2a3a5a; color: #e0e0e0;
-      padding: 10px 14px; border-radius: 60px; font-size: 1rem; min-width: 120px; min-height: 44px;
-    }
-    .chat-input-row input[type="text"]::placeholder { color: #64748b; }
-    .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; }
-    .file-input-wrapper input[type="file"] {
-      position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
-    }
-    .call-controls { display: none; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
-    .call-controls.active { display: flex; }
-    .invite-area {
-      display: none; background: #1a2530; border: 1px dashed #3b82f6;
-      border-radius: 16px; padding: 12px; margin: 12px 0; font-size: 0.9rem; color: #94a3b8;
-    }
-    .invite-area.active { display: block; }
-    .invite-area .link-label { font-weight: bold; color: #3b82f6; }
-    .invite-area .link-url { display: none; }
-    .status {
-      text-align: center; font-size: 1rem; padding: 10px; border-radius: 60px;
-      background: rgba(0,0,0,0.3); margin: 10px 0; color: #e0e0e0;
-    }
-    .block-init { display: block; }
-    .block-call { display: none; }
-    .emoji-picker {
-      display: none; padding: 8px; background: #1e293b; border: 1px solid #2a3a5a;
-      border-radius: 16px; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
-    }
-    .emoji-picker.active { display: flex; }
-    .emoji-picker span {
-      font-size: 1.8rem; cursor: pointer; transition: transform 0.1s;
-      padding: 4px; border-radius: 8px;
-    }
-    .emoji-picker span:hover { background: #2a3a5a; transform: scale(1.2); }
-    .exit-btn-wrapper { display: flex; justify-content: flex-end; margin-top: 8px; }
-    .input-field {
-      background: #0f172a; border: 1px solid #2a3a5a; color: #e0e0e0;
-      padding: 12px 18px; border-radius: 60px; font-size: 1rem; min-width: 140px; flex: 1; min-height: 44px;
-    }
-    .input-field::placeholder { color: #64748b; }
-    #logPanel {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 420px;
-      max-height: 50vh;
-      background: #0f172a;
-      border: 1px solid #3b82f6;
-      border-radius: 16px;
-      box-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
-      padding: 12px;
-      z-index: 1000;
-      display: none;
-      flex-direction: column;
-      backdrop-filter: blur(8px);
-      transition: all 0.3s;
-      overflow: hidden;
-    }
-    #logPanel.active { display: flex; }
-    #logPanel .log-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #2a3a5a;
-      padding-bottom: 6px;
-      margin-bottom: 8px;
-      color: #94a3b8;
-      font-size: 0.9rem;
-    }
-    #logPanel .log-header button {
-      background: #ef4444;
-      border: none;
-      color: white;
-      padding: 2px 10px;
-      border-radius: 30px;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-    #logPanel .log-body {
-      flex: 1;
-      overflow-y: auto;
-      max-height: 300px;
-      font-size: 0.8rem;
-      font-family: monospace;
-      color: #cbd5e1;
-      line-height: 1.5;
-      padding-right: 4px;
-    }
-    #logPanel .log-body .log-entry {
-      border-bottom: 1px solid #1e293b;
-      padding: 4px 0;
-    }
-    #logPanel .log-body .log-entry.error { color: #f87171; }
-    #logPanel .log-body .log-entry.warn { color: #fbbf24; }
-    #logPanel .log-body .log-entry.info { color: #60a5fa; }
-    #logPanel .log-body .log-entry.success { color: #34d399; }
-    #logPanel .log-body .log-entry .time { color: #64748b; font-size: 0.7rem; margin-right: 8px; }
-    .log-toggle-btn {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #3b82f6;
-      border: none;
-      color: white;
-      border-radius: 60px;
-      padding: 12px 20px;
-      z-index: 1001;
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-      font-weight: 600;
-    }
-    .log-toggle-btn:hover { background: #2563eb; }
-    @media (max-width: 600px) {
-      .header h1 { font-size: 1.8rem; }
-      .video-box { flex: 1 1 130px; min-width: 100px; }
-      .btn { font-size: 0.9rem; padding: 12px 18px; min-height: 48px; }
-      .btn-sm { padding: 8px 14px; min-height: 40px; font-size: 0.85rem; }
-      .splash-content .logo { font-size: 3rem; padding: 15px 25px; }
-      .splash-content .logo span { font-size: 1.2rem; }
-      #logPanel { width: calc(100% - 40px); bottom: 80px; right: 20px; max-height: 40vh; }
-    }
+    /* Панель приглашения */
+    .invite-bar { padding: 10px; background: #e9ecef; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #ddd; }
+    .invite-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+    .invite-btn { padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex-shrink: 0; }
+
+    /* Сообщения */
+    .messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; word-break: break-word; font-size: 14px; }
+    .msg.my { align-self: flex-end; background: #007bff; color: white; }
+    .msg.peer { align-self: flex-start; background: #e4e6eb; color: #000; }
+    .msg.system { align-self: center; background: #fff3cd; color: #856404; font-size: 12px; }
+
+    /* Форма и Эмодзи */
+    .footer { padding: 10px; display: flex; gap: 8px; border-top: 1px solid #eee; align-items: center; }
+    .footer input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+    .emoji-btn, .send-btn { background: none; border: none; font-size: 20px; cursor: pointer; }
+    .send-btn { color: #007bff; font-weight: bold; font-size: 16px; }
+
+    .emoji-picker { display: none; padding: 8px; background: #f8f9fa; border-top: 1px solid #eee; gap: 10px; font-size: 20px; justify-content: space-around; }
+    .emoji-picker span { cursor: pointer; }
   </style>
 </head>
 <body>
 
-<!-- ЭКРАН ЗАГРУЗКИ -->
-<div id="splashScreen">
-  <div class="splash-content">
-    <div class="ornament">⚔️</div>
-    <div class="logo">🛡️<span>Secure Chat</span></div>
-    <div class="subtitle">Добро пожаловать, путник</div>
-    <div class="ornament">★</div>
-    <div class="loading-bar"><div class="fill"></div></div>
-  </div>
-</div>
-
-<!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
-<div id="app">
+<div class="chat-card">
+  <!-- Шапка -->
   <div class="header">
-    <h1>🔒 Secure Chat</h1>
-    <div class="subtitle">Шифрование • Звонки • Файлы</div>
+    <h3>Чат</h3>
+    <button class="call-btn" onclick="startCall()">📞 Позвонить</button>
   </div>
 
-  <div id="initBlock" class="block-init">
-    <div class="flex-row">
-      <button class="btn btn-success" id="createRoomBtn">➕ Создать комнату</button>
-      <button class="btn btn-secondary" id="joinRoomBtn">🔗 Присоединиться</button>
-      <button class="btn btn-secondary" id="testDeviceBtn">🎤 Проверить устройства</button>
-    </div>
-    <div id="joinPanel" style="display: none; margin-top: 15px;">
-      <div class="flex-row">
-        <input class="input-field" id="roomInput" placeholder="ID комнаты" />
-        <button class="btn btn-secondary btn-sm" id="doJoinBtn">Войти</button>
-      </div>
-      <div style="text-align:center;color:#94a3b8;font-size:0.9rem;margin-top:5px;">
-        <i>Введите ID комнаты, который вам дали.</i>
-      </div>
-    </div>
-    <div id="statusInit" class="status" style="margin-top:20px; background:transparent;">Готов к связи</div>
+  <!-- Панель со ссылкой -->
+  <div class="invite-bar">
+    <span id="status-text">Создание комнаты...</span>
+    <button class="invite-btn" onclick="copyInviteLink()">📋 Ссылка</button>
   </div>
 
-  <div id="callBlock" class="block-call">
-    <div class="video-grid" id="videoGrid">
-      <div class="video-box" id="localVideoBox">
-        <video id="localVideo" autoplay muted playsinline></video>
-        <div class="label">Я</div>
-      </div>
-      <div class="video-box" id="remoteVideoBox">
-        <video id="remoteVideo" autoplay playsinline></video>
-        <div class="label">Товарищ</div>
-      </div>
-    </div>
+  <!-- Сообщения -->
+  <div class="messages" id="messages"></div>
 
-    <div class="call-controls" id="callControls">
-      <button class="btn btn-sm btn-success" id="audioCallBtn">🎙 Аудиозвонок</button>
-      <button class="btn btn-sm btn-success" id="videoCallBtn">📹 Видеозвонок</button>
-      <button class="btn btn-sm" id="toggleAudioBtn">🔇 Заглушить</button>
-      <button class="btn btn-sm" id="toggleVideoBtn">📷 Выключить</button>
-      <button class="btn btn-danger btn-sm" id="hangupBtn">⛔ Прервать</button>
-    </div>
+  <!-- Панель Эмодзи -->
+  <div class="emoji-picker" id="emoji-picker">
+    <span onclick="addEmoji('😀')">😀</span>
+    <span onclick="addEmoji('😂')">😂</span>
+    <span onclick="addEmoji('❤️')">❤️</span>
+    <span onclick="addEmoji('👍')">👍</span>
+    <span onclick="addEmoji('🔥')">🔥</span>
+  </div>
 
-    <div class="chat-area" id="chatArea">
-      <div class="emoji-picker" id="emojiPicker">
-        <span>😀</span><span>😂</span><span>😍</span><span>👍</span><span>❤️</span>
-        <span>🔥</span><span>🎉</span><span>😎</span><span>🙏</span><span>💩</span>
-        <span>🙈</span><span>🚀</span><span>🤔</span><span>😊</span><span>👋</span>
-        <span>👀</span><span>🤣</span><span>🥳</span><span>💪</span><span>✨</span>
-        <span>🌟</span><span>⭐</span><span>🌙</span><span>☀️</span><span>⚡</span>
-        <span>❄️</span><span>💧</span><span>🌊</span><span>🌈</span>
-      </div>
-      <div class="chat-messages" id="chatMessages"></div>
-      <div class="chat-input-row">
-        <button class="btn btn-secondary btn-sm" id="emojiToggleBtn">😀</button>
-        <input type="text" id="chatInput" placeholder="Установка соединения..." disabled />
-        <button class="btn btn-sm" id="sendChatBtn" disabled>Отправить</button>
-        <div class="file-input-wrapper">
-          <button class="btn btn-sm btn-secondary" disabled id="fileBtn">📎 Файл</button>
-          <input type="file" id="fileInput" accept="image/*,video/*" multiple disabled />
-        </div>
-      </div>
-    </div>
-
-    <div class="invite-area" id="inviteArea">
-      <div><span class="link-label">🔗 Пригласительная ссылка:</span></div>
-      <div class="link-url"><a id="inviteLink" href="#" target="_blank">Ссылка</a></div>
-      <div class="flex-row" style="gap:8px; margin-top:6px;">
-        <button class="btn btn-secondary btn-sm" id="copyLinkBtn">📋 Копировать ссылку</button>
-      </div>
-    </div>
-
-    <div class="status" id="statusDisplay">⏳ Ожидание соединения...</div>
-
-    <div class="exit-btn-wrapper">
-      <button class="btn btn-danger btn-sm" id="exitRoomBtn">🚪 Выйти из комнаты</button>
-    </div>
+  <!-- Ввод -->
+  <div class="footer">
+    <button class="emoji-btn" onclick="toggleEmoji()">😊</button>
+    <input type="text" id="message-input" placeholder="Сообщение..." onkeydown="if(event.key==='Enter') sendMessage()">
+    <button class="send-btn" onclick="sendMessage()">Отправить</button>
   </div>
 </div>
 
-<!-- КНОПКА ПОКАЗАТЬ ЛОГИ -->
-<button class="log-toggle-btn" id="logToggleBtn">📋 Логи</button>
-
-<!-- ПАНЕЛЬ ЛОГОВ -->
-<div id="logPanel">
-  <div class="log-header">
-    <span>📋 Журнал событий</span>
-    <button id="clearLogBtn">Очистить</button>
-  </div>
-  <div class="log-body" id="logBody"></div>
-</div>
+<audio id="remote-audio" autoplay></audio>
 
 <script>
-// ======================================================================
-// 0. ЛОГГЕР
-// ======================================================================
-const logBody = document.getElementById('logBody');
-const logToggleBtn = document.getElementById('logToggleBtn');
-const clearLogBtn = document.getElementById('clearLogBtn');
-const logPanel = document.getElementById('logPanel');
+  const peer = new Peer();
+  let conn = null;
+  let targetPeerId = null;
 
-function log(level, message, data = null) {
-  const entry = document.createElement('div');
-  entry.className = 'log-entry ' + level;
-  const time = new Date().toLocaleTimeString();
-  let text = `<span class="time">[${time}]</span> ${message}`;
-  if (data) {
-    try {
-      const str = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
-      text += ' <span style="color:#94a3b8;font-size:0.75rem;">' + str + '</span>';
-    } catch(e) {}
-  }
-  entry.innerHTML = text;
-  logBody.appendChild(entry);
-  logBody.scrollTop = logBody.scrollHeight;
-  console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](message, data || '');
-}
+  // Инициализация при открытии страницы
+  peer.on('open', (id) => {
+    // Проверяем, есть ли ID в адресе ссылки (#peerId)
+    const remoteId = window.location.hash.substring(1);
 
-logToggleBtn.addEventListener('click', () => {
-  logPanel.classList.toggle('active');
-  logToggleBtn.textContent = logPanel.classList.contains('active') ? '✕ Закрыть логи' : '📋 Логи';
-});
-
-clearLogBtn.addEventListener('click', () => {
-  logBody.innerHTML = '';
-  log('info', 'Логи очищены');
-});
-
-// ======================================================================
-// 1. КОНФИГУРАЦИЯ (Исправленный список STUN/TURN серверов)
-// ======================================================================
-const PEER_OPTIONS = {
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' },
-      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-    ]
-  },
-  debug: 2
-};
-
-// ======================================================================
-// 2. FIREBASE
-// ======================================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
-  authDomain: "chatt-6d410.firebaseapp.com",
-  projectId: "chatt-6d410",
-  storageBucket: "chatt-6d410.firebasestorage.app",
-  messagingSenderId: "901741126959",
-  appId: "1:901741126959:web:97734153fa537a5ab16dda"
-};
-if (typeof firebase !== 'undefined' && !firebase.apps.length) firebase.initializeApp(firebaseConfig);
-
-// ======================================================================
-// 3. ШИФРОВАНИЕ
-// ======================================================================
-function generateKeyPair() {
-  const pair = nacl.box.keyPair();
-  return { publicKey: nacl.util.encodeBase64(pair.publicKey), secretKey: nacl.util.encodeBase64(pair.secretKey) };
-}
-function encryptMessage(msg, recipientPubKey, senderSecKey) {
-  const recipientPub = nacl.util.decodeBase64(recipientPubKey);
-  const senderSec = nacl.util.decodeBase64(senderSecKey);
-  const nonce = nacl.randomBytes(24);
-  const msgUint8 = new TextEncoder().encode(msg);
-  const encrypted = nacl.box(msgUint8, nonce, recipientPub, senderSec);
-  return { nonce: nacl.util.encodeBase64(nonce), encrypted: nacl.util.encodeBase64(encrypted) };
-}
-function decryptMessage(pkg, senderPubKey, recipientSecKey) {
-  try {
-    const { nonce, encrypted } = pkg;
-    const senderPub = nacl.util.decodeBase64(senderPubKey);
-    const recipientSec = nacl.util.decodeBase64(recipientSecKey);
-    const nonceUint8 = nacl.util.decodeBase64(nonce);
-    const encryptedUint8 = nacl.util.decodeBase64(encrypted);
-    const decrypted = nacl.box.open(encryptedUint8, nonceUint8, senderPub, recipientSec);
-    if (!decrypted) throw new Error('Decryption failed');
-    return new TextDecoder().decode(decrypted);
-  } catch (e) {
-    log('error', 'Ошибка расшифровки: ' + e.message);
-    return null;
-  }
-}
-
-// ======================================================================
-// 4. СОСТОЯНИЕ ПРИЛОЖЕНИЯ
-// ======================================================================
-let currentRoom = null;
-let peer = null;
-let conn = null;
-let call = null;
-let localStream = null;
-let remoteStream = null;
-let isInitiator = false;
-let messages = [];
-let hasVideo = false, hasAudio = false;
-let myKeyPair = null;
-let peerPublicKey = null;
-
-// DOM
-const splash = document.getElementById('splashScreen');
-const app = document.getElementById('app');
-const initBlock = document.getElementById('initBlock');
-const callBlock = document.getElementById('callBlock');
-const statusInit = document.getElementById('statusInit');
-const statusDisplay = document.getElementById('statusDisplay');
-const localVideo = document.getElementById('localVideo');
-const remoteVideo = document.getElementById('remoteVideo');
-const chatMessages = document.getElementById('chatMessages');
-const chatInput = document.getElementById('chatInput');
-const sendChatBtn = document.getElementById('sendChatBtn');
-const fileInput = document.getElementById('fileInput');
-const fileBtn = document.getElementById('fileBtn');
-const inviteLink = document.getElementById('inviteLink');
-const createRoomBtn = document.getElementById('createRoomBtn');
-const joinRoomBtn = document.getElementById('joinRoomBtn');
-const joinPanel = document.getElementById('joinPanel');
-const roomInput = document.getElementById('roomInput');
-const doJoinBtn = document.getElementById('doJoinBtn');
-const testDeviceBtn = document.getElementById('testDeviceBtn');
-const toggleAudioBtn = document.getElementById('toggleAudioBtn');
-const toggleVideoBtn = document.getElementById('toggleVideoBtn');
-const hangupBtn = document.getElementById('hangupBtn');
-const copyLinkBtn = document.getElementById('copyLinkBtn');
-const exitRoomBtn = document.getElementById('exitRoomBtn');
-const emojiToggleBtn = document.getElementById('emojiToggleBtn');
-const emojiPicker = document.getElementById('emojiPicker');
-const audioCallBtn = document.getElementById('audioCallBtn');
-const videoCallBtn = document.getElementById('videoCallBtn');
-
-// ======================================================================
-// 5. ГЕНЕРАЦИЯ ФЕЙКОВОГО МЕДИА
-// ======================================================================
-function createFakeAudioTrack() {
-  const audioCtx = new AudioContext();
-  const oscillator = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  gain.gain.value = 0;
-  oscillator.connect(gain);
-  gain.connect(audioCtx.destination);
-  oscillator.start();
-  const stream = audioCtx.createMediaStreamDestination().stream;
-  return stream.getAudioTracks()[0];
-}
-
-function createFakeVideoTrack(width = 160, height = 120) {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#111';
-  ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = '#3b82f6';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('🔒', width/2 - 20, height/2 + 5);
-  const stream = canvas.captureStream(1);
-  return stream.getVideoTracks()[0];
-}
-
-function getFakeStream() {
-  const stream = new MediaStream();
-  try {
-    const audioTrack = createFakeAudioTrack();
-    if (audioTrack) stream.addTrack(audioTrack);
-    log('info', 'Добавлен фейковый аудио-трек');
-  } catch (e) {
-    log('warn', 'Не удалось создать фейковый аудио-трек: ' + e.message);
-  }
-  try {
-    const videoTrack = createFakeVideoTrack();
-    if (videoTrack) stream.addTrack(videoTrack);
-    log('info', 'Добавлен фейковый видео-трек');
-  } catch (e) {
-    log('warn', 'Не удалось создать фейковый видео-трек: ' + e.message);
-  }
-  return stream;
-}
-
-// ======================================================================
-// 6. ВСПОМОГАТЕЛЬНЫЕ
-// ======================================================================
-function addMessage(sender, content, mediaType = 'text', timestamp = Date.now()) {
-  const div = document.createElement('div');
-  div.className = 'msg';
-  const timeStr = new Date(timestamp).toLocaleTimeString();
-  let displayContent = content;
-  if (mediaType === 'image') displayContent = `<img src="${content}" alt="Изображение" />`;
-  else if (mediaType === 'video') displayContent = `<video src="${content}" controls style="max-width:120px;max-height:120px;"></video>`;
-  div.innerHTML = `<span class="sender">${sender}</span> <span class="time">${timeStr}</span><br>${displayContent}`;
-  chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// ======================================================================
-// 7. ПРОВЕРКА УСТРОЙСТВ
-// ======================================================================
-async function testDevices() {
-  statusInit.textContent = '🔍 Проверка устройств...';
-  log('info', 'Проверка устройств...');
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    stream.getTracks().forEach(t => t.stop());
-    statusInit.textContent = '✅ Все устройства работают!';
-    log('success', 'Устройства работают');
-  } catch (e) {
-    statusInit.textContent = '⚠️ Частичная ошибка: ' + e.message;
-    log('error', 'Ошибка проверки устройств: ' + e.message);
-  }
-}
-
-// ======================================================================
-// 8. ЗАПУСК МЕДИА
-// ======================================================================
-async function getMedia(retries = 2) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      hasVideo = true; hasAudio = true;
-      log('info', 'Получен реальный поток с видео и аудио');
-      return stream;
-    } catch (e1) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        hasVideo = false; hasAudio = true;
-        log('info', 'Получен реальный поток только с аудио');
-        return stream;
-      } catch (e2) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
-          hasVideo = true; hasAudio = false;
-          log('info', 'Получен реальный поток только с видео');
-          return stream;
-        } catch (e3) {
-          if (attempt === retries) {
-            log('error', 'Создаём фейковый поток');
-            const fakeStream = getFakeStream();
-            hasVideo = fakeStream.getVideoTracks().length > 0;
-            hasAudio = fakeStream.getAudioTracks().length > 0;
-            return fakeStream;
-          }
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      }
-    }
-  }
-  return new MediaStream();
-}
-
-// ======================================================================
-// 9. НАСТРОЙКА ОБРАБОТЧИКОВ СОЕДИНЕНИЯ (ИСПРАВЛЕНО)
-// ======================================================================
-function setupConnectionHandlers() {
-  if (!conn) return;
-
-  sendChatBtn.disabled = true;
-  chatInput.disabled = true;
-  fileBtn.disabled = true;
-  fileInput.disabled = true;
-  chatInput.placeholder = "Установка соединения...";
-
-  // Обработчик события успешного открытия канала
-  conn.on('open', () => {
-    log('success', 'DataChannel открыт!');
-    statusDisplay.textContent = '✅ Соединение для чата установлено!';
-    
-    sendChatBtn.disabled = false;
-    chatInput.disabled = false;
-    fileBtn.disabled = false;
-    fileInput.disabled = false;
-    chatInput.placeholder = "Введите сообщение...";
-
-    // Обмен публичным ключом шифрования
-    conn.send(JSON.stringify({ type: 'key', publicKey: myKeyPair.publicKey }));
-  });
-
-  conn.on('data', handleIncomingData);
-
-  conn.on('close', () => {
-    log('warn', 'DataChannel закрыт');
-    conn = null;
-    sendChatBtn.disabled = true;
-    chatInput.disabled = true;
-    fileBtn.disabled = true;
-    fileInput.disabled = true;
-    chatInput.placeholder = "Соединение закрыто";
-    statusDisplay.textContent = '⚠️ Соединение чата разорвано.';
-  });
-
-  conn.on('error', (err) => {
-    log('error', 'DataConnection error: ' + err.message);
-    statusDisplay.textContent = '❌ Ошибка соединения: ' + err.message;
-  });
-}
-
-// ======================================================================
-// 10. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ
-// ======================================================================
-function handleIncomingData(data) {
-  try {
-    let parsed;
-    if (typeof data === 'string') {
-      try {
-        parsed = JSON.parse(data);
-      } catch (e) {
-        addMessage('Товарищ', data, 'text');
-        return;
-      }
+    if (remoteId) {
+      // Зашли по ссылке — автоматически подключаемся
+      targetPeerId = remoteId;
+      document.getElementById('status-text').innerText = 'Подключение...';
+      connectToPeer(remoteId);
     } else {
-      parsed = data;
+      // Зашли просто так — создаем свою комнату
+      document.getElementById('status-text').innerText = 'Готов к подключению';
     }
+  });
 
-    if (parsed.type === 'key') {
-      peerPublicKey = parsed.publicKey;
-      log('success', 'Получен публичный ключ собеседника');
-      return;
-    }
-    if (parsed.type === 'message') {
-      let decryptedContent = parsed.content;
-      if (parsed.encrypted && peerPublicKey) {
-        const decrypted = decryptMessage(parsed.encrypted, peerPublicKey, myKeyPair.secretKey);
-        if (decrypted) decryptedContent = decrypted;
+  // Прием входящего подключения чата
+  peer.on('connection', (c) => {
+    conn = c;
+    targetPeerId = c.peer;
+    setupChat();
+    appendMessage('Собеседник подключился!', 'system');
+  });
+
+  // Прием входящего аудиовызова
+  peer.on('call', async (call) => {
+    if (confirm("Входящий голосовой вызов! Ответить?")) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        call.answer(stream);
+        call.on('stream', (remoteStream) => {
+          document.getElementById('remote-audio').srcObject = remoteStream;
+        });
+      } catch (e) {
+        alert("Ошибка доступа к микрофону");
       }
-      addMessage(parsed.sender || 'Товарищ', decryptedContent, parsed.mediaType || 'text', parsed.timestamp);
-      log('info', 'Сообщение получено');
+    }
+  });
+
+  // Авто-подключение к создателю комнаты
+  function connectToPeer(remoteId) {
+    conn = peer.connect(remoteId);
+    setupChat();
+  }
+
+  function setupChat() {
+    conn.on('open', () => {
+      document.getElementById('status-text').innerText = 'В сети ✅';
+    });
+    conn.on('data', (data) => {
+      appendMessage(data, 'peer');
+    });
+  }
+
+  // Копирование пригласительной ссылки
+  function copyInviteLink() {
+    if (!peer.id) return alert("Сеть еще не готова!");
+    const link = `${window.location.origin}${window.location.pathname}#${peer.id}`;
+    navigator.clipboard.writeText(link).then(() => {
+      alert("Ссылка скопирована! Отправьте её собеседнику.");
+    });
+  }
+
+  // Отправка сообщений
+  function sendMessage() {
+    const input = document.getElementById('message-input');
+    const text = input.value.trim();
+    if (text && conn) {
+      conn.send(text);
+      appendMessage(text, 'my');
+      input.value = '';
+    } else if (!conn) {
+      alert("Ожидаем подключения собеседника по ссылке");
+    }
+  }
+
+  function appendMessage(text, type) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg ${type}`;
+    msgDiv.innerText = text;
+    const container = document.getElementById('messages');
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // Аудиозвонок
+  async function startCall() {
+    if (!targetPeerId) {
+      alert("Нет подключенного собеседника для звонка!");
       return;
     }
-  } catch (e) {
-    log('error', 'Ошибка обработки входящих данных: ' + e.message, e);
-  }
-}
-
-// ======================================================================
-// 11. ОТПРАВКА СООБЩЕНИЯ (ИСПРАВЛЕНО)
-// ======================================================================
-function sendMessage(text, mediaType = 'text', fileData = null) {
-  // Проверяем наличие соединения и флаг conn.open!
-  if (!conn || !conn.open) {
-    statusDisplay.textContent = '⚠️ Соединение ещё устанавливается, подождите пара секунд...';
-    log('warn', 'Попытка отправки до открытия conn.open');
-    return;
-  }
-
-  const rawContent = fileData || text;
-  if (!rawContent && mediaType === 'text') return;
-
-  let encrypted = null;
-  let finalContent = rawContent;
-
-  if (peerPublicKey) {
-    encrypted = encryptMessage(rawContent, peerPublicKey, myKeyPair.secretKey);
-    if (encrypted) finalContent = '[Encrypted]';
-  }
-
-  const msg = {
-    type: 'message',
-    sender: 'Я',
-    content: finalContent,
-    mediaType,
-    timestamp: Date.now(),
-    encrypted
-  };
-
-  try {
-    conn.send(JSON.stringify(msg));
-    addMessage('Я', rawContent, mediaType, msg.timestamp);
-    log('info', 'Сообщение успешно отправлено');
-  } catch (e) {
-    log('error', 'Ошибка отправки: ' + e.message, e);
-    statusDisplay.textContent = '❌ Ошибка отправки: ' + e.message;
-  }
-}
-
-// ======================================================================
-// 12. СОЗДАНИЕ КОМНАТЫ
-// ======================================================================
-async function createRoom() {
-  try {
-    statusInit.textContent = '🛠 Создаём комнату...';
-    if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
-
-    const roomId = 'chat-' + Math.random().toString(36).substring(2, 10);
-    currentRoom = roomId;
-    isInitiator = true;
-
-    myKeyPair = generateKeyPair();
-
-    const stream = await getMedia(2);
-    localStream = stream;
-    if (hasVideo) localVideo.srcObject = stream;
-
-    peer = new Peer(roomId, PEER_OPTIONS);
-    await new Promise((resolve, reject) => {
-      peer.on('open', () => resolve());
-      peer.on('error', reject);
-    });
-
-    peer.on('connection', (dataConn) => {
-      if (conn) { dataConn.close(); return; }
-      conn = dataConn;
-      log('info', 'Принято входящее подключение: ' + dataConn.peer);
-      setupConnectionHandlers();
-    });
-
-    peer.on('call', (incomingCall) => {
-      log('info', 'Входящий звонок');
-      statusDisplay.textContent = '📞 Входящий звонок! Нажмите "Аудиозвонок" или "Видеозвонок"';
-      window._pendingCall = incomingCall;
-    });
-
-    const link = window.location.origin + window.location.pathname + '?room=' + encodeURIComponent(roomId);
-    inviteLink.href = link;
-    inviteLink.textContent = link;
-
-    showCallBlock();
-    statusDisplay.textContent = '⏳ Ожидаем подключения собеседника...';
-    statusInit.textContent = 'Готов к связи';
-
-  } catch (err) {
-    log('error', 'Ошибка создания комнаты: ' + err.message, err);
-    statusInit.textContent = '❌ Ошибка: ' + err.message;
-  }
-}
-
-// ======================================================================
-// 13. ПРИСОЕДИНЕНИЕ К КОМНАТЕ
-// ======================================================================
-async function joinRoom(roomId) {
-  try {
-    if (!roomId) {
-      statusInit.textContent = '❌ Введите ID комнаты.';
-      return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const call = peer.call(targetPeerId, stream);
+      call.on('stream', (remoteStream) => {
+        document.getElementById('remote-audio').srcObject = remoteStream;
+      });
+    } catch (err) {
+      alert("Не удалось получить доступ к микрофону");
     }
-    if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
-
-    currentRoom = roomId;
-    isInitiator = false;
-
-    myKeyPair = generateKeyPair();
-
-    const stream = await getMedia(2);
-    localStream = stream;
-    if (hasVideo) localVideo.srcObject = stream;
-
-    peer = new Peer(PEER_OPTIONS);
-    await new Promise((resolve, reject) => {
-      peer.on('open', () => resolve());
-      peer.on('error', reject);
-    });
-
-    conn = peer.connect(roomId);
-    setupConnectionHandlers();
-
-    showCallBlock();
-    document.getElementById('inviteArea').classList.remove('active');
-    statusDisplay.textContent = '⏳ Соединение устанавливается...';
-    statusInit.textContent = 'Готов к связи';
-
-  } catch (err) {
-    log('error', 'Ошибка присоединения: ' + err.message, err);
-    statusInit.textContent = '❌ Ошибка соединения: ' + err.message;
   }
-}
 
-// ======================================================================
-// 14. ИНИЦИАЦИЯ ЗВОНКА
-// ======================================================================
-function startCall(wantVideo) {
-  if (!peer || !currentRoom || call) return;
-  if (!localStream) return;
-
-  log('info', 'Начало звонка...');
-  const callObj = peer.call(currentRoom, localStream);
-  call = callObj;
-
-  call.on('stream', (remote) => {
-    remoteStream = remote;
-    remoteVideo.srcObject = remote;
-    statusDisplay.textContent = '📞 На связи!';
-  });
-  call.on('close', () => {
-    remoteVideo.srcObject = null;
-    statusDisplay.textContent = '🔴 Звонок завершён.';
-    call = null;
-  });
-  call.on('error', (err) => {
-    log('error', 'Ошибка звонка: ' + err.message);
-    call = null;
-  });
-}
-
-// ======================================================================
-// 15. УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ И БЛОКАМИ
-// ======================================================================
-function showCallBlock() {
-  initBlock.style.display = 'none';
-  callBlock.style.display = 'block';
-  document.getElementById('videoGrid').classList.add('active');
-  document.getElementById('callControls').classList.add('active');
-  document.getElementById('chatArea').classList.add('active');
-  document.getElementById('inviteArea').classList.add('active');
-}
-
-function hideCallBlock() {
-  initBlock.style.display = 'block';
-  callBlock.style.display = 'none';
-  document.getElementById('videoGrid').classList.remove('active');
-  document.getElementById('callControls').classList.remove('active');
-  document.getElementById('chatArea').classList.remove('active');
-  document.getElementById('inviteArea').classList.remove('active');
-}
-
-function exitRoom() {
-  if (call) { call.close(); call = null; }
-  if (conn) { conn.close(); conn = null; }
-  if (peer) { peer.destroy(); peer = null; }
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
+  function toggleEmoji() {
+    const picker = document.getElementById('emoji-picker');
+    picker.style.display = picker.style.display === 'flex' ? 'none' : 'flex';
   }
-  remoteVideo.srcObject = null;
-  localVideo.srcObject = null;
-  hideCallBlock();
-  chatMessages.innerHTML = '';
-  currentRoom = null;
-  peerPublicKey = null;
-  statusInit.textContent = 'Вы вышли из комнаты.';
-  
-  sendChatBtn.disabled = true;
-  chatInput.disabled = true;
-  fileBtn.disabled = true;
-  fileInput.disabled = true;
-  chatInput.placeholder = "Соединение закрыто";
-}
 
-// ======================================================================
-// 16. СОБЫТИЯ ЭЛЕМЕНТОВ
-// ======================================================================
-createRoomBtn.addEventListener('click', createRoom);
-joinRoomBtn.addEventListener('click', () => {
-  joinPanel.style.display = joinPanel.style.display === 'none' ? 'flex' : 'none';
-});
-doJoinBtn.addEventListener('click', () => joinRoom(roomInput.value.trim()));
-testDeviceBtn.addEventListener('click', testDevices);
-audioCallBtn.addEventListener('click', () => startCall(false));
-videoCallBtn.addEventListener('click', () => startCall(true));
-hangupBtn.addEventListener('click', exitRoom);
-exitRoomBtn.addEventListener('click', exitRoom);
-
-toggleAudioBtn.addEventListener('click', () => {
-  if (localStream && localStream.getAudioTracks().length) {
-    const tr = localStream.getAudioTracks()[0];
-    tr.enabled = !tr.enabled;
-    toggleAudioBtn.textContent = tr.enabled ? '🔇 Заглушить' : '🔊 Включить';
+  function addEmoji(emoji) {
+    const input = document.getElementById('message-input');
+    input.value += emoji;
+    toggleEmoji();
+    input.focus();
   }
-});
-
-toggleVideoBtn.addEventListener('click', () => {
-  if (localStream && localStream.getVideoTracks().length) {
-    const tr = localStream.getVideoTracks()[0];
-    tr.enabled = !tr.enabled;
-    toggleVideoBtn.textContent = tr.enabled ? '📷 Выключить' : '📷 Включить';
-  }
-});
-
-copyLinkBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(inviteLink.href).then(() => {
-    statusDisplay.textContent = '✅ Ссылка скопирована!';
-  });
-});
-
-sendChatBtn.addEventListener('click', () => {
-  const text = chatInput.value.trim();
-  if (text) {
-    sendMessage(text);
-    chatInput.value = '';
-  }
-});
-
-chatInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendChatBtn.click();
-});
-
-fileInput.addEventListener('change', (e) => {
-  const files = e.target.files;
-  for (let file of files) {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target.result;
-      const mediaType = file.type.startsWith('video/') ? 'video' : 'image';
-      sendMessage(base64, mediaType);
-    };
-    reader.readAsDataURL(file);
-  }
-  fileInput.value = '';
-});
-
-emojiToggleBtn.addEventListener('click', () => emojiPicker.classList.toggle('active'));
-emojiPicker.addEventListener('click', (e) => {
-  if (e.target.tagName === 'SPAN') {
-    chatInput.value += e.target.textContent;
-    chatInput.focus();
-    emojiPicker.classList.remove('active');
-  }
-});
-
-// ======================================================================
-// 17. ИНИЦИАЛИЗАЦИЯ И АВТОВХОД
-// ======================================================================
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    splash.classList.add('hidden');
-    app.classList.add('visible');
-  }, 2500);
-
-  const params = new URLSearchParams(window.location.search);
-  const room = params.get('room');
-  if (room) {
-    log('info', 'Автовход по ссылке в комнату: ' + room);
-    setTimeout(() => joinRoom(room), 1500);
-  }
-});
 </script>
+
 </body>
 </html>
