@@ -14,21 +14,6 @@
   <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
   <style>
     :root {
-      --bg-body: #f5f7fa;
-      --bg-app: #ffffff;
-      --bg-messages: #f8fafc;
-      --text-main: #1e293b;
-      --text-muted: #64748b;
-      --border-color: #e2e8f0;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --msg-sent: #3b82f6;
-      --msg-sent-text: #ffffff;
-      --msg-received: #ffffff;
-      --msg-received-text: #1e293b;
-    }
-
-    [data-theme="dark"] {
       --bg-body: #0f172a;
       --bg-app: #1e293b;
       --bg-messages: #0f172a;
@@ -52,7 +37,6 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      transition: background 0.3s;
     }
     #app {
       width: 100%;
@@ -60,7 +44,7 @@
       height: 100vh;
       max-height: 800px;
       background: var(--bg-app);
-      box-shadow: 0 0 20px rgba(0,0,0,0.2);
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
       display: flex;
       flex-direction: column;
       border-radius: 20px;
@@ -77,7 +61,8 @@
       text-align: center;
     }
     #home h1 { font-size: 2rem; margin-bottom: 10px; }
-    #home p { color: var(--text-muted); margin-bottom: 30px; }
+    #home p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; }
+    
     .btn {
       background: var(--primary);
       color: white;
@@ -92,8 +77,7 @@
       align-items: center;
       gap: 8px;
     }
-    .btn:hover { background: var(--primary-hover); transform: scale(1.02); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn:hover { background: var(--primary-hover); }
     .btn-secondary { background: var(--border-color); color: var(--text-main); }
 
     #chat { display: none; flex-direction: column; height: 100%; }
@@ -107,7 +91,7 @@
       flex-shrink: 0;
     }
     #header h2 { font-size: 1rem; font-weight: 600; }
-    #header-actions { display: flex; gap: 4px; align-items: center; }
+    #header-actions { display: flex; gap: 6px; align-items: center; }
     #header-actions button {
       background: none;
       border: none;
@@ -118,7 +102,6 @@
       color: var(--text-main);
     }
     #header-actions button:hover { background: var(--border-color); }
-    #header-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #messages {
       flex: 1;
@@ -126,7 +109,7 @@
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       background: var(--bg-messages);
     }
     .msg {
@@ -152,16 +135,17 @@
     }
     .msg-name { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; }
     .msg-sent .msg-name { color: #bfdbfe; }
-    .msg-time { font-size: 0.6rem; opacity: 0.7; margin-top: 2px; text-align: right; }
+    .msg-time { font-size: 0.65rem; opacity: 0.7; margin-top: 4px; text-align: right; }
     .msg-audio audio { max-width: 200px; height: 36px; }
 
     .msg-video-note video {
-      width: 180px;
-      height: 180px;
+      width: 160px;
+      height: 160px;
       border-radius: 50%;
       object-fit: cover;
       background: #000;
-      border: 2px solid rgba(255,255,255,0.2);
+      border: 2px solid var(--primary);
+      display: block;
     }
 
     #emoji-picker {
@@ -171,16 +155,10 @@
       border-top: 1px solid var(--border-color);
       flex-wrap: wrap;
       gap: 8px;
-      max-height: 120px;
+      max-height: 110px;
       overflow-y: auto;
     }
-    #emoji-picker span {
-      font-size: 1.3rem;
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-    }
-    #emoji-picker span:hover { background: var(--border-color); }
+    #emoji-picker span { font-size: 1.3rem; cursor: pointer; padding: 4px; }
 
     #input-area {
       padding: 10px 12px;
@@ -201,17 +179,14 @@
       font-size: 0.95rem;
       outline: none;
     }
-    #input-area .icon-btn {
+    .icon-btn {
       background: none;
       border: none;
-      font-size: 1.3rem;
+      font-size: 1.2rem;
       cursor: pointer;
       padding: 6px;
       border-radius: 50%;
       color: var(--text-main);
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
     #sendBtn {
       background: var(--primary);
@@ -222,24 +197,21 @@
       height: 40px;
       font-size: 1.1rem;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
     #video-note-preview-modal {
       display: none;
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85);
+      background: rgba(0,0,0,0.9);
       z-index: 20;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
     #video-note-preview {
-      width: 220px;
-      height: 220px;
+      width: 200px;
+      height: 200px;
       border-radius: 50%;
       object-fit: cover;
       border: 4px solid var(--primary);
@@ -256,35 +228,29 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 10;
+      z-index: 30;
     }
     #call-container video {
-      width: 100%; max-width: 400px;
+      width: 100%; max-width: 360px;
       background: #1e293b;
-      border-radius: 12px; margin: 10px;
+      border-radius: 12px;
     }
     #call-controls button {
       background: #ef4444; border: none; color: white;
       border-radius: 50%; width: 56px; height: 56px;
-      font-size: 1.4rem; cursor: pointer;
+      font-size: 1.4rem; cursor: pointer; margin-top: 20px;
     }
-    .call-info { color: white; font-size: 1.1rem; margin-bottom: 15px; }
-
-    @media (max-width: 480px) {
-      #app { border-radius: 0; max-height: 100vh; }
-    }
+    .call-info { color: white; font-size: 1.1rem; margin-bottom: 15px; font-weight: 600; }
   </style>
 </head>
 <body>
 <div id="app">
   <div id="home">
     <h1>🔒 Secure Chat</h1>
-    <p>Анонимный чат с шифрованием и звонками</p>
-    <button class="btn" id="createRoomBtn">➕ Создать комнату</button>
-    <div style="margin-top: 20px; font-size: 0.9rem; color: var(--text-muted);">
-      Или введите ID комнаты:
-      <input id="roomIdInput" placeholder="например, abc123" style="margin-top: 8px; padding: 8px; border-radius: 20px; border:1px solid var(--border-color); width:200px; background:var(--bg-body); color:var(--text-main); text-align:center;">
-      <button class="btn btn-secondary" id="joinRoomBtn" style="margin-top: 8px;">Войти</button>
+    <p>Зашифрованная комната с паролем в ссылке</p>
+    <button class="btn" id="createRoomBtn">➕ Создать защищенную комнату</button>
+    <div style="margin-top: 25px; font-size: 0.9rem; color: var(--text-muted);">
+      Или войти по ссылке с ключом доступа
     </div>
   </div>
 
@@ -292,10 +258,9 @@
     <div id="header">
       <h2 id="roomTitle">Комната</h2>
       <div id="header-actions">
-        <button id="copyLinkBtn" title="Скопировать ссылку">🔗</button>
+        <button id="copyLinkBtn" title="Скопировать ссылку с паролем">🔗</button>
         <button id="audioCallBtn" title="Аудиозвонок">📞</button>
         <button id="videoCallBtn" title="Видеозвонок">📹</button>
-        <button id="themeToggleBtn" title="Сменить тему">🌙</button>
         <button id="leaveRoomBtn" title="Выйти">✕</button>
       </div>
     </div>
@@ -308,9 +273,9 @@
     </div>
 
     <div id="input-area">
-      <button class="icon-btn" id="emojiBtn" title="Смайлики">😀</button>
+      <button class="icon-btn" id="emojiBtn">😀</button>
       <button class="icon-btn" id="recordBtn" title="Голосовое сообщение">🎤</button>
-      <button class="icon-btn" id="videoNoteBtn" title="Видеосообщение (кружок)">📹</button>
+      <button class="icon-btn" id="videoNoteBtn" title="Видеокружок">📹</button>
       <input id="msgInput" placeholder="Сообщение..." autocomplete="off">
       <button id="sendBtn">➤</button>
     </div>
@@ -318,14 +283,14 @@
 
   <div id="video-note-preview-modal">
     <video id="video-note-preview" autoplay playsinline muted></video>
-    <div id="videoNoteTimer" style="color:white; font-size:1.2rem; margin-bottom:15px; font-weight:600;">00:60</div>
+    <div id="videoNoteTimer" style="color:white; font-size:1.2rem; margin-bottom:15px; font-weight:600;">00:15</div>
     <button class="btn" id="stopVideoNoteBtn" style="background:#ef4444;">⏹ Отправить кружок</button>
   </div>
 
   <div id="call-container">
     <div class="call-info" id="callInfo">Звонок...</div>
-    <video id="remoteVideo" autoplay playsinline style="width:90%; height:auto; max-height:60vh;"></video>
-    <video id="localVideo" autoplay playsinline muted style="width:110px; position:absolute; bottom:90px; right:20px; border-radius:10px; background:#1e293b;"></video>
+    <video id="remoteVideo" autoplay playsinline style="width:90%; height:auto; max-height:50vh;"></video>
+    <video id="localVideo" autoplay playsinline muted style="width:100px; position:absolute; bottom:90px; right:20px; border-radius:10px; background:#1e293b;"></video>
     <audio id="remoteAudio" autoplay></audio>
     <div id="call-controls">
       <button id="hangupBtn">📴</button>
@@ -343,8 +308,7 @@ const firebaseConfig = {
   projectId: "chatt-6d410",
   storageBucket: "chatt-6d410.firebasestorage.app",
   messagingSenderId: "901741126959",
-  appId: "1:901741126959:web:97734153fa537a5ab16dda",
-  measurementId: "G-H616TJEYXC"
+  appId: "1:901741126959:web:97734153fa537a5ab16dda"
 };
 
 if (!firebase.apps.length) {
@@ -352,20 +316,27 @@ if (!firebase.apps.length) {
 }
 const db = firebase.firestore();
 
-// ============================ ВАРЫ И СОСТОЯНИЯ ============================
+// ============================ СОСТОЯНИЯ ЧАТА ============================
 let roomId = '';
+let roomSecretPass = '';
 let myName = '';
-let myKeyPair = null;
-let participants = {};      
-let messages = [];
-let localPlainMessages = {}; 
+let myUserId = '';
+
+let roomRef = null;
+let messagesRef = null;
+let participantsRef = null;
+let signalRef = null;
+
+let unsubscribeMessages = null;
+let unsubscribeParticipants = null;
+let unsubscribeSignals = null;
+
+const processedMsgIds = new Set();
+let participants = {};
+
 let peer = null;
 let localStream = null;
-
-// Флаги состояний вызова
 let isCallActive = false;
-let isCalling = false;
-let isAnswering = false;
 
 let mediaRecorder = null;
 let audioChunks = [];
@@ -373,19 +344,9 @@ let isRecording = false;
 
 let videoNoteRecorder = null;
 let videoNoteChunks = [];
-let isRecordingVideoNote = false;
 let videoNoteStream = null;
 let videoNoteTimerInterval = null;
-let videoNoteSecondsLeft = 60;
-
-let myUserId = '';          
-let roomRef = null;         
-let messagesRef = null;     
-let participantsRef = null; 
-let signalRef = null;       
-let unsubscribeMessages = null;
-let unsubscribeParticipants = null;
-let unsubscribeSignals = null;
+let videoNoteSecondsLeft = 15;
 
 // DOM Элементы
 const home = document.getElementById('home');
@@ -394,8 +355,6 @@ const messagesDiv = document.getElementById('messages');
 const msgInput = document.getElementById('msgInput');
 const sendBtn = document.getElementById('sendBtn');
 const createRoomBtn = document.getElementById('createRoomBtn');
-const joinRoomBtn = document.getElementById('joinRoomBtn');
-const roomIdInput = document.getElementById('roomIdInput');
 const roomTitle = document.getElementById('roomTitle');
 const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 const audioCallBtn = document.getElementById('audioCallBtn');
@@ -404,8 +363,8 @@ const recordBtn = document.getElementById('recordBtn');
 const videoNoteBtn = document.getElementById('videoNoteBtn');
 const emojiBtn = document.getElementById('emojiBtn');
 const emojiPicker = document.getElementById('emoji-picker');
-const themeToggleBtn = document.getElementById('themeToggleBtn');
 const copyLinkBtn = document.getElementById('copyLinkBtn');
+
 const callContainer = document.getElementById('call-container');
 const remoteVideo = document.getElementById('remoteVideo');
 const localVideo = document.getElementById('localVideo');
@@ -418,246 +377,222 @@ const videoNotePreview = document.getElementById('video-note-preview');
 const videoNoteTimer = document.getElementById('videoNoteTimer');
 const stopVideoNoteBtn = document.getElementById('stopVideoNoteBtn');
 
-// ============================ ТЕМА ============================
-function setTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  themeToggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
-  localStorage.setItem('theme', theme);
-}
-themeToggleBtn.addEventListener('click', () => {
-  const current = document.documentElement.getAttribute('data-theme') || 'light';
-  setTheme(current === 'dark' ? 'light' : 'dark');
-});
-setTheme(localStorage.getItem('theme') || 'light');
-
-// ============================ ЭМОДЗИ ============================
-emojiBtn.addEventListener('click', () => {
-  emojiPicker.style.display = emojiPicker.style.display === 'flex' ? 'none' : 'flex';
-});
-emojiPicker.addEventListener('click', (e) => {
-  if (e.target.tagName === 'SPAN') {
-    msgInput.value += e.target.textContent;
-    msgInput.focus();
-  }
-});
-
-// ============================ ХЕЛПЕРЫ ============================
+// ============================ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============================
 function generateRandomName() {
-  const adjs = ['Быстрый', 'Смелый', 'Тихий', 'Умный', 'Добрый', 'Сильный', 'Весёлый', 'Спокойный'];
-  const nouns = ['Лис', 'Волк', 'Медведь', 'Заяц', 'Сокол', 'Дельфин', 'Тигр', 'Панда'];
+  const adjs = ['Быстрый', 'Тихий', 'Умный', 'Сильный', 'Весёлый', 'Смелый'];
+  const nouns = ['Лис', 'Волк', 'Заяц', 'Сокол', 'Дельфин', 'Тигр'];
   return adjs[Math.floor(Math.random() * adjs.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
 }
 
-function generateKeyPair() {
-  const pair = nacl.box.keyPair();
-  return {
-    publicKey: nacl.util.encodeBase64(pair.publicKey),
-    secretKey: nacl.util.encodeBase64(pair.secretKey),
-  };
+function generateUserId() {
+  return 'usr_' + Math.random().toString(36).substring(2, 9);
 }
 
-function encryptMessage(message, recipientPublicKeyBase64, senderSecretKeyBase64) {
-  const recipientPublicKey = nacl.util.decodeBase64(recipientPublicKeyBase64);
-  const senderSecretKey = nacl.util.decodeBase64(senderSecretKeyBase64);
-  const nonce = nacl.randomBytes(24);
-  const msgUint8 = new TextEncoder().encode(message);
-  const encrypted = nacl.box(msgUint8, nonce, recipientPublicKey, senderSecretKey);
-  return {
-    nonce: nacl.util.encodeBase64(nonce),
-    encrypted: nacl.util.encodeBase64(encrypted),
-  };
+function generatePasscode() {
+  return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
 }
 
-function decryptMessage(encryptedPackage, senderPublicKeyBase64, recipientSecretKeyBase64) {
+// Простая симметричная XOR-кодировка с паролем комнаты для лёгкой передачи в базах
+function encryptText(text, pass) {
   try {
-    const { nonce, encrypted } = encryptedPackage;
-    const senderPublicKey = nacl.util.decodeBase64(senderPublicKeyBase64);
-    const recipientSecretKey = nacl.util.decodeBase64(recipientSecretKeyBase64);
-    const nonceUint8 = nacl.util.decodeBase64(nonce);
-    const encryptedUint8 = nacl.util.decodeBase64(encrypted);
-    const decrypted = nacl.box.open(encryptedUint8, nonceUint8, senderPublicKey, recipientSecretKey);
-    if (!decrypted) throw new Error('Decryption failed');
-    return new TextDecoder().decode(decrypted);
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      result += String.fromCharCode(text.charCodeAt(i) ^ pass.charCodeAt(i % pass.length));
+    }
+    return btoa(unescape(encodeURIComponent(result)));
+  } catch (e) {
+    return text;
+  }
+}
+
+function decryptText(cipher, pass) {
+  try {
+    const text = decodeURIComponent(escape(atob(cipher)));
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      result += String.fromCharCode(text.charCodeAt(i) ^ pass.charCodeAt(i % pass.length));
+    }
+    return result;
   } catch (e) {
     return null;
   }
 }
 
-function formatTime(date) {
-  if (!date) return '';
-  const d = date.toDate ? date.toDate() : new Date(date);
-  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+function formatTime(timestamp) {
+  if (!timestamp) return '';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-function generateUserId() {
-  return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-}
-
-function setCallButtonsDisabled(state) {
-  audioCallBtn.disabled = state;
-  videoCallBtn.disabled = state;
-}
-
-// ============================ ВХОД В КОМНАТУ ============================
-async function enterRoom(roomIdParam) {
+// ============================ ВХОД И ВЫХОД ИЗ КОМНАТЫ ============================
+async function enterRoom(roomIdParam, passParam) {
   roomId = roomIdParam;
+  roomSecretPass = passParam;
   myUserId = generateUserId();
   myName = generateRandomName();
-  myKeyPair = generateKeyPair();
 
   roomRef = db.collection('rooms').doc(roomId);
   messagesRef = roomRef.collection('messages');
   participantsRef = roomRef.collection('participants');
   signalRef = roomRef.collection('signals');
 
+  // Добавляем себя в базу участников
   await participantsRef.doc(myUserId).set({
     name: myName,
-    publicKey: myKeyPair.publicKey,
     joinedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
+  // Отслеживаем список участников
+  unsubscribeParticipants = participantsRef.onSnapshot(snapshot => {
+    participants = {};
+    snapshot.forEach(doc => {
+      participants[doc.id] = doc.data();
+    });
+    const count = Object.keys(participants).length;
+    roomTitle.textContent = `Комната (${count})`;
+  });
+
+  // Слушаем сообщения и устраняем дубликаты
   unsubscribeMessages = messagesRef.orderBy('createdAt', 'asc').onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
-        const data = change.doc.data();
-        data.id = change.doc.id;
-        messages.push(data);
-        renderMessages();
+        const msgDoc = change.doc;
+        if (!processedMsgIds.has(msgDoc.id)) {
+          processedMsgIds.add(msgDoc.id);
+          renderSingleMessage(msgDoc.id, msgDoc.data());
+        }
       }
     });
   });
 
-  unsubscribeParticipants = participantsRef.onSnapshot(snapshot => {
-    participants = {};
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      participants[doc.id] = { publicKey: data.publicKey, name: data.name };
-    });
-    const count = Object.keys(participants).length;
-    roomTitle.textContent = `Комната ${roomId} (${count})`;
-  });
-
-  const enterTime = Date.now();
+  // Слушаем сигналы WebRTC звонков
+  const startTime = Date.now();
   unsubscribeSignals = signalRef.where('target', '==', myUserId).onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
         const data = change.doc.data();
         change.doc.ref.delete().catch(() => {});
-        
-        // Фильтруем старые фантомные сигналы (старше 15 сек)
-        const sigTime = data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : Date.now()) : Date.now();
-        if (Math.abs(enterTime - sigTime) < 15000) {
-          handleSignal(data);
-        }
+        handleIncomingSignal(data);
       }
     });
   });
 
+  // Формируем безопасный хэш ссылок: #ROOM_ID:SECRET_PASS
+  window.location.hash = `${roomId}:${roomSecretPass}`;
+
   home.style.display = 'none';
   chat.style.display = 'flex';
   msgInput.focus();
-
-  window.location.hash = roomId;
 }
 
-copyLinkBtn.addEventListener('click', () => {
-  const shareUrl = `${window.location.origin}${window.location.pathname}#${roomId}`;
-  navigator.clipboard.writeText(shareUrl);
-  alert('Ссылка скопирована!');
+// Автоматический вылет при закрытии браузера/вкладки
+window.addEventListener('beforeunload', () => {
+  if (participantsRef && myUserId) {
+    participantsRef.doc(myUserId).delete();
+  }
 });
 
-// ============================ СООБЩЕНИЯ ============================
-function renderMessages() {
-  messagesDiv.innerHTML = '';
-  messages.forEach(msg => {
-    const isOwn = msg.senderId === myUserId;
-    const div = document.createElement('div');
-    div.className = `msg ${isOwn ? 'msg-sent' : 'msg-received'}`;
+function leaveRoom() {
+  if (participantsRef && myUserId) {
+    participantsRef.doc(myUserId).delete().catch(() => {});
+  }
+  if (unsubscribeMessages) unsubscribeMessages();
+  if (unsubscribeParticipants) unsubscribeParticipants();
+  if (unsubscribeSignals) unsubscribeSignals();
 
-    const nameSpan = document.createElement('div');
-    nameSpan.className = 'msg-name';
-    nameSpan.textContent = isOwn ? 'Вы' : (msg.senderName || 'Неизвестный');
-    div.appendChild(nameSpan);
+  processedMsgIds.clear();
+  participants = {};
+  roomId = '';
+  roomSecretPass = '';
+  myUserId = '';
 
-    let decryptedText = null;
+  hangupCall();
 
-    if (isOwn) {
-      decryptedText = localPlainMessages[msg.id];
+  home.style.display = 'flex';
+  chat.style.display = 'none';
+  window.location.hash = '';
+}
+
+leaveRoomBtn.addEventListener('click', leaveRoom);
+
+createRoomBtn.addEventListener('click', () => {
+  const newRoomId = Math.random().toString(36).substring(2, 8);
+  const newSecretPass = generatePasscode();
+  enterRoom(newRoomId, newSecretPass);
+});
+
+copyLinkBtn.addEventListener('click', () => {
+  const fullLink = `${window.location.origin}${window.location.pathname}#${roomId}:${roomSecretPass}`;
+  navigator.clipboard.writeText(fullLink);
+  alert('Защищенная ссылка с паролем скопирована!');
+});
+
+// ============================ ОТРИСОВКА СООБЩЕНИЙ ============================
+function renderSingleMessage(id, msg) {
+  const isOwn = msg.senderId === myUserId;
+  const div = document.createElement('div');
+  div.className = `msg ${isOwn ? 'msg-sent' : 'msg-received'}`;
+
+  const nameSpan = document.createElement('div');
+  nameSpan.className = 'msg-name';
+  nameSpan.textContent = isOwn ? 'Вы' : (msg.senderName || 'Участник');
+  div.appendChild(nameSpan);
+
+  const decryptedContent = decryptText(msg.encryptedData, roomSecretPass);
+
+  if (msg.type === 'audio') {
+    const audioContainer = document.createElement('div');
+    audioContainer.className = 'msg-audio';
+    if (decryptedContent) {
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = decryptedContent;
+      audioContainer.appendChild(audio);
     } else {
-      try {
-        const senderCryptoKey = participants[msg.senderId]?.publicKey;
-        if (senderCryptoKey) {
-          decryptedText = decryptMessage(
-            JSON.parse(msg.encryptedMessage),
-            senderCryptoKey,
-            myKeyPair.secretKey
-          );
-        }
-      } catch (e) {}
+      audioContainer.textContent = '🔒 Ошибка ключа доступа';
     }
-
-    if (msg.type === 'audio') {
-      const audioContainer = document.createElement('div');
-      audioContainer.className = 'msg-audio';
-      if (decryptedText) {
-        const audio = document.createElement('audio');
-        audio.controls = true;
-        audio.src = decryptedText.startsWith('data:') ? decryptedText : `data:audio/webm;base64,${decryptedText}`;
-        audioContainer.appendChild(audio);
-      } else {
-        audioContainer.textContent = '🔒 Зашифрованное аудио';
-      }
-      div.appendChild(audioContainer);
-    } else if (msg.type === 'videoNote') {
-      const videoContainer = document.createElement('div');
-      videoContainer.className = 'msg-video-note';
-      if (decryptedText) {
-        const video = document.createElement('video');
-        video.controls = true;
-        video.playsInline = true;
-        video.src = decryptedText.startsWith('data:') ? decryptedText : `data:video/webm;base64,${decryptedText}`;
-        videoContainer.appendChild(video);
-      } else {
-        videoContainer.textContent = '🔒 Зашифрованное видеосообщение';
-      }
-      div.appendChild(videoContainer);
+    div.appendChild(audioContainer);
+  } else if (msg.type === 'videoNote') {
+    const videoContainer = document.createElement('div');
+    videoContainer.className = 'msg-video-note';
+    if (decryptedContent) {
+      const video = document.createElement('video');
+      video.controls = true;
+      video.playsInline = true;
+      video.src = decryptedContent;
+      videoContainer.appendChild(video);
     } else {
-      const textSpan = document.createElement('div');
-      textSpan.textContent = decryptedText || '🔒 Не удалось расшифровать';
-      div.appendChild(textSpan);
+      videoContainer.textContent = '🔒 Ошибка ключа доступа';
     }
+    div.appendChild(videoContainer);
+  } else {
+    const textSpan = document.createElement('div');
+    textSpan.textContent = decryptedContent || '🔒 Не удалось расшифровать';
+    div.appendChild(textSpan);
+  }
 
-    const timeSpan = document.createElement('div');
-    timeSpan.className = 'msg-time';
-    timeSpan.textContent = formatTime(msg.createdAt);
-    div.appendChild(timeSpan);
+  const timeSpan = document.createElement('div');
+  timeSpan.className = 'msg-time';
+  timeSpan.textContent = formatTime(msg.createdAt);
+  div.appendChild(timeSpan);
 
-    messagesDiv.appendChild(div);
-  });
+  messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
+// ============================ ОТПРАВКА СООБЩЕНИЙ ============================
 async function sendTextMessage(text) {
   if (!text.trim() || !roomId) return;
-  const recipientId = Object.keys(participants).find(id => id !== myUserId);
-  if (!recipientId) {
-    alert('Ожидайте подключения второго участника!');
-    return;
-  }
-  const recipientPublicKey = participants[recipientId]?.publicKey;
-  if (!recipientPublicKey) return;
+  const cipher = encryptText(text, roomSecretPass);
 
-  const encrypted = encryptMessage(text, recipientPublicKey, myKeyPair.secretKey);
-  
-  const docRef = await messagesRef.add({
+  await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
-    encryptedMessage: JSON.stringify(encrypted),
+    encryptedData: cipher,
     type: 'text',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
-  
-  localPlainMessages[docRef.id] = text;
+
   msgInput.value = '';
   emojiPicker.style.display = 'none';
   msgInput.focus();
@@ -665,26 +600,32 @@ async function sendTextMessage(text) {
 
 async function sendMediaMessage(base64Data, type) {
   if (!roomId) return;
-  const recipientId = Object.keys(participants).find(id => id !== myUserId);
-  if (!recipientId) {
-    alert('Ожидайте подключения второго участника!');
-    return;
-  }
-  const recipientPublicKey = participants[recipientId]?.publicKey;
-  if (!recipientPublicKey) return;
+  const cipher = encryptText(base64Data, roomSecretPass);
 
-  const encrypted = encryptMessage(base64Data, recipientPublicKey, myKeyPair.secretKey);
-  const docRef = await messagesRef.add({
+  await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
-    encryptedMessage: JSON.stringify(encrypted),
+    encryptedData: cipher,
     type: type,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
-
-  localPlainMessages[docRef.id] = base64Data;
 }
 
+sendBtn.addEventListener('click', () => sendTextMessage(msgInput.value));
+msgInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendTextMessage(msgInput.value); });
+
+// Эмодзи
+emojiBtn.addEventListener('click', () => {
+  emojiPicker.style.display = emojiPicker.style.display === 'flex' ? 'none' : 'flex';
+});
+emojiPicker.addEventListener('click', e => {
+  if (e.target.tagName === 'SPAN') {
+    msgInput.value += e.target.textContent;
+    msgInput.focus();
+  }
+});
+
+// ============================ ГОЛОСОВЫЕ СООБЩЕНИЯ ============================
 recordBtn.addEventListener('click', async () => {
   if (isRecording) {
     if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
@@ -696,109 +637,81 @@ recordBtn.addEventListener('click', async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
     audioChunks = [];
-    mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
     mediaRecorder.onstop = () => {
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
       const reader = new FileReader();
       reader.onload = () => sendMediaMessage(reader.result, 'audio');
       reader.readAsDataURL(blob);
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(t => t.stop());
     };
     mediaRecorder.start();
     isRecording = true;
     recordBtn.textContent = '⏹️';
   } catch (e) {
-    alert('Нет доступа к микрофону');
+    alert('Микрофон недоступен');
   }
 });
 
-// ============================ ВИДЕО КРУЖОЧКИ (БЕЗ ЗАВИСАНИЙ) ============================
+// ============================ ОПТИМИЗИРОВАННЫЕ ВИДЕО КРУЖКИ ============================
 async function startVideoNoteRecording() {
-  closeVideoNoteModal(); // Безопасная очистка прошлых запусков
+  closeVideoNoteModal();
 
   try {
-    // Используем максимально легкие и совместимые настройки для мобильных и ПК
-    videoNoteStream = await navigator.mediaDevices.getUserMedia({ 
-      audio: true, 
-      video: { 
-        width: { ideal: 480 }, 
-        height: { ideal: 480 }, 
-        facingMode: 'user' 
-      } 
+    // Низкие настройки разрешения и битрейта, чтобы не привысить лимит базы Firestore (1MB)
+    videoNoteStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: { width: 240, height: 240, frameRate: 15 }
     });
   } catch (e) {
-    console.error("Media error:", e);
-    alert('Не удалось получить доступ к камере или микрофону.');
-    return; // Не блокируем интерфейс
+    alert('Не удалось запустить камеру/микрофон.');
+    return;
   }
 
+  videoNotePreview.srcObject = videoNoteStream;
+  videoNoteModal.style.display = 'flex';
+
+  const options = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 250000 };
   try {
-    videoNotePreview.srcObject = videoNoteStream;
-    videoNoteModal.style.display = 'flex';
-
-    let options = { mimeType: 'video/webm' };
-    if (!MediaRecorder.isTypeSupported('video/webm')) {
-      if (MediaRecorder.isTypeSupported('video/mp4')) {
-        options = { mimeType: 'video/mp4' };
-      } else {
-        options = {}; 
-      }
-    }
-
     videoNoteRecorder = new MediaRecorder(videoNoteStream, options);
-    videoNoteChunks = [];
-
-    videoNoteRecorder.ondataavailable = event => {
-      if (event.data && event.data.size > 0) {
-        videoNoteChunks.push(event.data);
-      }
-    };
-
-    videoNoteRecorder.onstop = () => {
-      const mimeType = videoNoteRecorder.mimeType || 'video/webm';
-      const blob = new Blob(videoNoteChunks, { type: mimeType });
-      
-      if (blob.size > 0) {
-        const reader = new FileReader();
-        reader.onload = () => sendMediaMessage(reader.result, 'videoNote');
-        reader.readAsDataURL(blob);
-      }
-
-      closeVideoNoteModal();
-    };
-
-    videoNoteRecorder.start(1000); 
-    isRecordingVideoNote = true;
-    videoNoteSecondsLeft = 60;
-    videoNoteTimer.textContent = `00:60`;
-
-    if (videoNoteTimerInterval) clearInterval(videoNoteTimerInterval);
-    videoNoteTimerInterval = setInterval(() => {
-      videoNoteSecondsLeft--;
-      const secFormatted = videoNoteSecondsLeft < 10 ? `0${videoNoteSecondsLeft}` : videoNoteSecondsLeft;
-      videoNoteTimer.textContent = `00:${secFormatted}`;
-
-      if (videoNoteSecondsLeft <= 0) {
-        stopVideoNoteRecording();
-      }
-    }, 1000);
-
-  } catch (e) {
-    console.error("Recording error:", e);
-    alert('Ошибка создания записи.');
-    closeVideoNoteModal();
+  } catch(e) {
+    videoNoteRecorder = new MediaRecorder(videoNoteStream);
   }
+
+  videoNoteChunks = [];
+  videoNoteRecorder.ondataavailable = e => { if (e.data.size > 0) videoNoteChunks.push(e.data); };
+
+  videoNoteRecorder.onstop = () => {
+    const blob = new Blob(videoNoteChunks, { type: videoNoteRecorder.mimeType || 'video/webm' });
+    const reader = new FileReader();
+    reader.onload = () => sendMediaMessage(reader.result, 'videoNote');
+    reader.readAsDataURL(blob);
+    closeVideoNoteModal();
+  };
+
+  videoNoteRecorder.start(500);
+  videoNoteSecondsLeft = 15;
+  videoNoteTimer.textContent = '00:15';
+
+  if (videoNoteTimerInterval) clearInterval(videoNoteTimerInterval);
+  videoNoteTimerInterval = setInterval(() => {
+    videoNoteSecondsLeft--;
+    const sec = videoNoteSecondsLeft < 10 ? `0${videoNoteSecondsLeft}` : videoNoteSecondsLeft;
+    videoNoteTimer.textContent = `00:${sec}`;
+
+    if (videoNoteSecondsLeft <= 0) {
+      stopVideoNoteRecording();
+    }
+  }, 1000);
 }
 
 function closeVideoNoteModal() {
   if (videoNoteStream) {
-    videoNoteStream.getTracks().forEach(track => track.stop());
+    videoNoteStream.getTracks().forEach(t => t.stop());
     videoNoteStream = null;
   }
-  videoNotePreview.srcObject = null;
   videoNoteModal.style.display = 'none';
   if (videoNoteTimerInterval) clearInterval(videoNoteTimerInterval);
-  isRecordingVideoNote = false;
 }
 
 function stopVideoNoteRecording() {
@@ -809,212 +722,119 @@ function stopVideoNoteRecording() {
   }
 }
 
-videoNoteBtn.addEventListener('click', () => {
-  const recipientId = Object.keys(participants).find(id => id !== myUserId);
-  if (!recipientId) return alert('Ожидайте подключения второй стороны!');
-  startVideoNoteRecording();
-});
-
+videoNoteBtn.addEventListener('click', startVideoNoteRecording);
 stopVideoNoteBtn.addEventListener('click', stopVideoNoteRecording);
 
-sendBtn.addEventListener('click', () => sendTextMessage(msgInput.value));
-msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendTextMessage(msgInput.value); });
-
-createRoomBtn.addEventListener('click', () => {
-  const newRoomId = Math.random().toString(36).substring(2, 8);
-  enterRoom(newRoomId);
-});
-
-joinRoomBtn.addEventListener('click', () => {
-  const id = roomIdInput.value.trim();
-  if (id) enterRoom(id);
-});
-
-window.addEventListener('load', () => {
-  const hashRoom = window.location.hash.replace('#', '').trim();
-  if (hashRoom) enterRoom(hashRoom);
-});
-
-leaveRoomBtn.addEventListener('click', () => {
-  if (unsubscribeMessages) unsubscribeMessages();
-  if (unsubscribeParticipants) unsubscribeParticipants();
-  if (unsubscribeSignals) unsubscribeSignals();
-  if (roomRef && myUserId) participantsRef.doc(myUserId).delete().catch(() => {});
-  
-  participants = {};
-  messages = [];
-  localPlainMessages = {};
-  roomId = '';
-  myUserId = '';
-  home.style.display = 'flex';
-  chat.style.display = 'none';
-  window.location.hash = '';
-  hangupCall();
-});
-
-// ============================ WEBRTC ЗВОНКИ (ПОЛНЫЙ ФИКС ОШИБОК) ============================
-function handleSignal(data) {
+// ============================ WEBRTC АУДИО И ВИДЕО ЗВОНКИ ============================
+function handleIncomingSignal(data) {
   const { signal, from, fromName, callType } = data;
-
-  if (!isCallActive && !isCalling && !isAnswering && !peer) {
-    isAnswering = true;
-    setCallButtonsDisabled(true);
-
-    const isVideoCall = (callType === 'video');
-    const callKindText = isVideoCall ? 'Видеозвонок' : 'Аудиозвонок';
-
+  if (!isCallActive && !peer) {
+    const isVideo = callType === 'video';
     setTimeout(() => {
-      if (confirm(`Входящий ${callKindText} от ${fromName || 'собеседника'}. Принять?`)) {
-        startPeer(false, from, isVideoCall, signal);
-      } else {
-        isAnswering = false;
-        setCallButtonsDisabled(false);
+      if (confirm(`Входящий ${isVideo ? 'видеозвонок' : 'аудиозвонок'} от ${fromName}. Ответить?`)) {
+        startPeerConnection(false, from, isVideo, signal);
       }
-    }, 50);
-  } else if (peer && (isCallActive || isCalling || isAnswering)) {
-    try {
-      peer.signal(signal);
-    } catch(e) {
-      console.warn("Signal handeling skipped:", e);
-    }
+    }, 100);
+  } else if (peer) {
+    try { peer.signal(signal); } catch(e) {}
   }
 }
 
-// Безопасный захват медиаустройств с автоматическим понижением требований
-async function getUserMediaSmart(wantVideo) {
-  if (wantVideo) {
-    try {
-      return await navigator.mediaDevices.getUserMedia({ 
-        audio: true, 
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } } 
-      });
-    } catch (e) {
-      console.warn("Камера недоступна или занята, попытка подключить только видео со стандартными настройками...", e);
-      try {
-        return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      } catch (e2) {
-        console.warn("Переход на только Аудио режим:", e2);
-      }
-    }
-  }
-  return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-}
+async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomingSignal = null) {
+  if (peer) hangupCall();
 
-async function startPeer(isInitiator, targetUserId, wantVideo, incomingSignal = null) {
-  const target = participants[targetUserId];
-  if (!target) {
-    alert('Собеседник недоступен');
-    hangupCall();
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: wantVideo ? { width: 480, height: 360 } : false
+    });
+  } catch (e) {
+    alert('Ошибка доступа к камере или микрофону.');
     return;
   }
 
-  // Очистка старых сессий
-  if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
-  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  localVideo.srcObject = localStream;
 
-  setCallButtonsDisabled(true);
-
-  try {
-    const stream = await getUserMediaSmart(wantVideo);
-    localStream = stream;
-    localVideo.srcObject = stream;
-
-    peer = new SimplePeer({
-      initiator: isInitiator,
-      trickle: true,
-      stream: stream,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' }
-        ]
-      }
-    });
-
-    peer.on('signal', signal => {
-      signalRef.add({
-        from: myUserId,
-        fromName: myName,
-        target: targetUserId,
-        callType: wantVideo ? 'video' : 'audio',
-        signal: signal,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    });
-
-    peer.on('stream', rStream => {
-      remoteVideo.srcObject = rStream;
-      remoteAudio.srcObject = rStream;
-
-      // Принудительный запуск воспроизведения без блокировки браузером
-      remoteVideo.play().catch(e => console.warn("Autoplay video error:", e));
-      remoteAudio.play().catch(e => console.warn("Autoplay audio error:", e));
-    });
-
-    peer.on('error', err => {
-      console.error('Peer connection error:', err);
-      hangupCall();
-    });
-
-    peer.on('close', () => hangupCall());
-
-    if (incomingSignal) {
-      peer.signal(incomingSignal);
+  peer = new SimplePeer({
+    initiator: isInitiator,
+    trickle: true,
+    stream: localStream,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
     }
+  });
 
-    isCallActive = true;
-    isCalling = false;
-    isAnswering = false;
-    callContainer.style.display = 'flex';
-    callInfo.textContent = isInitiator ? `Звонок ${target.name}...` : `Разговор с ${target.name}`;
+  peer.on('signal', signal => {
+    signalRef.add({
+      from: myUserId,
+      fromName: myName,
+      target: targetUserId,
+      callType: wantVideo ? 'video' : 'audio',
+      signal: signal,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  });
 
-  } catch (err) {
-    alert('Ошибка подключения медиаустройств: ' + err.message);
-    hangupCall();
+  peer.on('stream', rStream => {
+    remoteVideo.srcObject = rStream;
+    remoteAudio.srcObject = rStream;
+    remoteVideo.play().catch(() => {});
+    remoteAudio.play().catch(() => {});
+  });
+
+  peer.on('error', () => hangupCall());
+  peer.on('close', () => hangupCall());
+
+  if (incomingSignal) {
+    peer.signal(incomingSignal);
   }
+
+  isCallActive = true;
+  callContainer.style.display = 'flex';
+  callInfo.textContent = isInitiator ? 'Звоним собеседнику...' : 'Разговор зашифрован';
 }
 
 function hangupCall() {
-  isCalling = false;
-  isAnswering = false;
   isCallActive = false;
-
-  if (peer) { 
+  if (peer) {
     try { peer.destroy(); } catch(e){}
-    peer = null; 
+    peer = null;
   }
-  if (localStream) { 
-    localStream.getTracks().forEach(t => t.stop()); 
-    localStream = null; 
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
   }
-
   remoteVideo.srcObject = null;
   remoteAudio.srcObject = null;
   localVideo.srcObject = null;
   callContainer.style.display = 'none';
-
-  setCallButtonsDisabled(false);
 }
 
 audioCallBtn.addEventListener('click', () => {
-  if (isCallActive || isCalling || isAnswering) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
-  if (!targetId) return alert('Нет собеседника в комнате!');
-  isCalling = true;
-  startPeer(true, targetId, false);
+  if (!targetId) return alert('Ожидайте входа второго участника!');
+  startPeerConnection(true, targetId, false);
 });
 
 videoCallBtn.addEventListener('click', () => {
-  if (isCallActive || isCalling || isAnswering) return;
   const targetId = Object.keys(participants).find(id => id !== myUserId);
-  if (!targetId) return alert('Нет собеседника в комнате!');
-  isCalling = true;
-  startPeer(true, targetId, true);
+  if (!targetId) return alert('Ожидайте входа второго участника!');
+  startPeerConnection(true, targetId, true);
 });
 
 hangupBtn.addEventListener('click', hangupCall);
+
+// ============================ АВТО-ВХОД ПО ССЫЛКЕ ============================
+window.addEventListener('load', () => {
+  const hash = window.location.hash.replace('#', '').trim();
+  if (hash && hash.includes(':')) {
+    const parts = hash.split(':');
+    enterRoom(parts[0], parts[1]);
+  }
+});
 </script>
 </body>
 </html>
