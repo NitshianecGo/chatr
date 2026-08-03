@@ -13,7 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
   <style>
-    /* (стили без изменений, те же что и в предыдущей версии) */
+    /* (стили те же, что и в прошлой версии) */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -66,11 +66,7 @@
       display: inline-block;
       letter-spacing: 2px;
     }
-    .splash-content .ornament {
-      font-size: 3rem;
-      color: #b8860b;
-      margin: 10px 0;
-    }
+    .splash-content .ornament { font-size: 3rem; color: #b8860b; margin: 10px 0; }
     .splash-content .loading-bar {
       width: 240px;
       height: 4px;
@@ -106,260 +102,94 @@
       text-align: center;
       margin-bottom: 15px;
     }
-    .header h1 {
-      font-size: 2.2rem;
-      font-weight: 700;
-      color: #3b82f6;
-      text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-    }
-    .header .subtitle {
-      color: #94a3b8;
-      font-size: 1rem;
-      border-top: 1px solid #2a3a5a;
-      border-bottom: 1px solid #2a3a5a;
-      padding: 6px 0;
-    }
+    .header h1 { font-size: 2.2rem; font-weight: 700; color: #3b82f6; text-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+    .header .subtitle { color: #94a3b8; font-size: 1rem; border-top: 1px solid #2a3a5a; border-bottom: 1px solid #2a3a5a; padding: 6px 0; }
     .btn {
-      background: #3b82f6;
-      border: none;
-      color: white;
-      font-weight: 600;
-      padding: 12px 24px;
-      border-radius: 60px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-size: 1rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 4px 0 #1e40af;
-      touch-action: manipulation;
-      min-height: 48px;
+      background: #3b82f6; border: none; color: white; font-weight: 600;
+      padding: 12px 24px; border-radius: 60px; cursor: pointer; transition: all 0.2s;
+      font-size: 1rem; display: inline-flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 0 #1e40af; touch-action: manipulation; min-height: 48px;
     }
     .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1e40af; }
     .btn-secondary { background: #475569; box-shadow: 0 4px 0 #1e293b; }
     .btn-success { background: #22c55e; box-shadow: 0 4px 0 #15803d; }
     .btn-danger { background: #ef4444; box-shadow: 0 4px 0 #b91c1c; }
     .btn-sm { padding: 8px 16px; font-size: 0.9rem; min-height: 40px; }
-    .flex-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      justify-content: center;
-      align-items: center;
-      margin: 10px 0;
-    }
-    .video-grid {
-      display: none;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
-      margin: 15px 0;
-    }
+    .flex-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0; }
+    .video-grid { display: none; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 15px 0; }
     .video-grid.active { display: flex; }
     .video-box {
-      flex: 1 1 200px;
-      min-width: 140px;
-      background: #0a0505;
-      border: 2px solid #3b82f6;
-      border-radius: 16px;
-      overflow: hidden;
-      position: relative;
-      aspect-ratio: 4/3;
-      cursor: pointer;
+      flex: 1 1 200px; min-width: 140px; background: #0a0505; border: 2px solid #3b82f6;
+      border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 4/3; cursor: pointer;
     }
-    .video-box video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      background: #111;
-      display: block;
-    }
+    .video-box video { width: 100%; height: 100%; object-fit: cover; background: #111; display: block; }
     #localVideo { transform: scaleX(-1); }
     .video-box .label {
-      position: absolute;
-      bottom: 6px;
-      left: 6px;
-      background: rgba(0,0,0,0.7);
-      padding: 2px 12px;
-      border-radius: 30px;
-      font-size: 0.8rem;
-      color: #f8fafc;
-      border: 1px solid #3b82f6;
-      pointer-events: none;
+      position: absolute; bottom: 6px; left: 6px; background: rgba(0,0,0,0.7);
+      padding: 2px 12px; border-radius: 30px; font-size: 0.8rem; color: #f8fafc;
+      border: 1px solid #3b82f6; pointer-events: none;
     }
-    .chat-area {
-      display: none;
-      margin-top: 15px;
-      border-top: 1px solid #2a3a5a;
-      padding-top: 12px;
-    }
+    .chat-area { display: none; margin-top: 15px; border-top: 1px solid #2a3a5a; padding-top: 12px; }
     .chat-area.active { display: block; }
     .chat-messages {
-      max-height: 300px;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.3);
-      border-radius: 12px;
-      padding: 8px;
-      margin-bottom: 8px;
-      border: 1px solid #2a3a5a;
+      max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.3);
+      border-radius: 12px; padding: 8px; margin-bottom: 8px; border: 1px solid #2a3a5a;
     }
     .chat-messages .msg {
-      background: rgba(20, 30, 50, 0.6);
-      border-radius: 10px;
-      padding: 5px 10px;
-      margin-bottom: 5px;
-      color: #e0e0e0;
-      word-break: break-word;
-      font-size: 0.95rem;
+      background: rgba(20, 30, 50, 0.6); border-radius: 10px; padding: 5px 10px;
+      margin-bottom: 5px; color: #e0e0e0; word-break: break-word; font-size: 0.95rem;
     }
     .chat-messages .msg .sender { color: #60a5fa; font-weight: bold; }
     .chat-messages .msg .time { color: #94a3b8; font-size: 0.7rem; margin-left: 8px; }
     .chat-messages .msg img, .chat-messages .msg video {
-      max-width: 120px;
-      border-radius: 8px;
-      margin-top: 4px;
-      border: 1px solid #3b82f6;
+      max-width: 120px; border-radius: 8px; margin-top: 4px; border: 1px solid #3b82f6;
     }
-    .chat-input-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+    .chat-input-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .chat-input-row input[type="text"] {
-      flex: 1;
-      background: #0f172a;
-      border: 1px solid #2a3a5a;
-      color: #e0e0e0;
-      padding: 10px 14px;
-      border-radius: 60px;
-      font-size: 1rem;
-      min-width: 120px;
-      min-height: 44px;
+      flex: 1; background: #0f172a; border: 1px solid #2a3a5a; color: #e0e0e0;
+      padding: 10px 14px; border-radius: 60px; font-size: 1rem; min-width: 120px; min-height: 44px;
     }
     .chat-input-row input[type="text"]::placeholder { color: #64748b; }
-    .file-input-wrapper {
-      position: relative;
-      overflow: hidden;
-      display: inline-block;
-    }
+    .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; }
     .file-input-wrapper input[type="file"] {
-      position: absolute;
-      left: 0; top: 0;
-      opacity: 0;
-      width: 100%;
-      height: 100%;
-      cursor: pointer;
+      position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
     }
-    .call-controls {
-      display: none;
-      justify-content: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin: 10px 0;
-    }
+    .call-controls { display: none; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
     .call-controls.active { display: flex; }
     .invite-area {
-      display: none;
-      background: #1a2530;
-      border: 1px dashed #3b82f6;
-      border-radius: 16px;
-      padding: 12px;
-      margin: 12px 0;
-      font-size: 0.9rem;
-      color: #94a3b8;
+      display: none; background: #1a2530; border: 1px dashed #3b82f6;
+      border-radius: 16px; padding: 12px; margin: 12px 0; font-size: 0.9rem; color: #94a3b8;
     }
     .invite-area.active { display: block; }
     .invite-area .link-label { font-weight: bold; color: #3b82f6; }
-    .invite-area .link-url { display: none; }
-    .timer { color: #facc15; font-weight: bold; }
+    .invite-area .link-url { display: none; } /* скрываем ссылку */
     .status {
-      text-align: center;
-      font-size: 1rem;
-      padding: 10px;
-      border-radius: 60px;
-      background: rgba(0,0,0,0.3);
-      margin: 10px 0;
-      color: #e0e0e0;
+      text-align: center; font-size: 1rem; padding: 10px; border-radius: 60px;
+      background: rgba(0,0,0,0.3); margin: 10px 0; color: #e0e0e0;
     }
     .block-init { display: block; }
     .block-call { display: none; }
     .emoji-picker {
-      display: none;
-      padding: 8px;
-      background: #1e293b;
-      border: 1px solid #2a3a5a;
-      border-radius: 16px;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 8px;
+      display: none; padding: 8px; background: #1e293b; border: 1px solid #2a3a5a;
+      border-radius: 16px; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
     }
     .emoji-picker.active { display: flex; }
     .emoji-picker span {
-      font-size: 1.8rem;
-      cursor: pointer;
-      transition: transform 0.1s;
-      padding: 4px;
-      border-radius: 8px;
+      font-size: 1.8rem; cursor: pointer; transition: transform 0.1s;
+      padding: 4px; border-radius: 8px;
     }
     .emoji-picker span:hover { background: #2a3a5a; transform: scale(1.2); }
-    .exit-btn-wrapper {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 8px;
-    }
+    .exit-btn-wrapper { display: flex; justify-content: flex-end; margin-top: 8px; }
     .input-field {
-      background: #0f172a;
-      border: 1px solid #2a3a5a;
-      color: #e0e0e0;
-      padding: 12px 18px;
-      border-radius: 60px;
-      font-size: 1rem;
-      min-width: 140px;
-      flex: 1;
-      min-height: 44px;
+      background: #0f172a; border: 1px solid #2a3a5a; color: #e0e0e0;
+      padding: 12px 18px; border-radius: 60px; font-size: 1rem; min-width: 140px; flex: 1; min-height: 44px;
     }
     .input-field::placeholder { color: #64748b; }
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-    .modal.active { display: flex; }
-    .modal-content {
-      background: #1e293b;
-      border: 1px solid #3b82f6;
-      border-radius: 30px;
-      padding: 25px 20px;
-      max-width: 500px;
-      width: 100%;
-      color: #e0e0e0;
-      box-shadow: 0 0 50px rgba(59, 130, 246, 0.2);
-    }
-    .modal-content h2 { text-align: center; margin-bottom: 15px; color: #3b82f6; }
-    .modal-content label { display: block; margin: 10px 0 4px; font-size: 1rem; }
-    .modal-content input, .modal-content select {
-      width: 100%;
-      padding: 10px 14px;
-      background: #0f172a;
-      border: 1px solid #2a3a5a;
-      color: #e0e0e0;
-      border-radius: 60px;
-      font-size: 1rem;
-      min-height: 44px;
-    }
-    .modal-content .btn { width: 100%; margin-top: 12px; }
     @media (max-width: 600px) {
       .header h1 { font-size: 1.8rem; }
       .video-box { flex: 1 1 130px; min-width: 100px; }
       .btn { font-size: 0.9rem; padding: 12px 18px; min-height: 48px; }
       .btn-sm { padding: 8px 14px; min-height: 40px; font-size: 0.85rem; }
-      .modal-content { padding: 20px 15px; }
       .splash-content .logo { font-size: 3rem; padding: 15px 25px; }
       .splash-content .logo span { font-size: 1.2rem; }
     }
@@ -367,14 +197,11 @@
 </head>
 <body>
 
-<!-- ЭКРАН ЗАГРУЗКИ (WoW стиль) -->
+<!-- ЭКРАН ЗАГРУЗКИ -->
 <div id="splashScreen">
   <div class="splash-content">
     <div class="ornament">⚔️</div>
-    <div class="logo">
-      🛡️
-      <span>Secure Chat</span>
-    </div>
+    <div class="logo">🛡️<span>Secure Chat</span></div>
     <div class="subtitle">Добро пожаловать, путник</div>
     <div class="ornament">★</div>
     <div class="loading-bar"><div class="fill"></div></div>
@@ -398,11 +225,10 @@
     <div id="joinPanel" style="display: none; margin-top: 15px;">
       <div class="flex-row">
         <input class="input-field" id="roomInput" placeholder="ID комнаты" />
-        <input class="input-field" id="tokenInput" placeholder="Токен" />
         <button class="btn btn-secondary btn-sm" id="doJoinBtn">Войти</button>
       </div>
       <div style="text-align:center;color:#94a3b8;font-size:0.9rem;margin-top:5px;">
-        <i>Введите ID и токен из пригласительной ссылки.</i>
+        <i>Введите ID комнаты, который вам дали.</i>
       </div>
     </div>
     <div id="statusInit" class="status" style="margin-top:20px; background:transparent;">Готов к связи</div>
@@ -453,11 +279,6 @@
       <div class="link-url"><a id="inviteLink" href="#" target="_blank">Ссылка</a></div>
       <div class="flex-row" style="gap:8px; margin-top:6px;">
         <button class="btn btn-secondary btn-sm" id="copyLinkBtn">📋 Копировать ссылку</button>
-        <button class="btn btn-secondary btn-sm" id="refreshLinkBtn">🔄 Обновить</button>
-      </div>
-      <div style="font-size:0.85rem; color:#94a3b8; margin-top:4px;">
-        Токен обновляется каждые 5 мин.
-        <span id="timerDisplay" class="timer">(до смены: 5:00)</span>
       </div>
     </div>
 
@@ -486,8 +307,6 @@ const PEER_OPTIONS = {
     ]
   }
 };
-const BASE_SECRET = "SecureChat2026_SecretKey";
-let secretVersion = 0;
 
 // ======================================================================
 // 2. FIREBASE (хранение сообщений)
@@ -532,55 +351,22 @@ function decryptMessage(pkg, senderPubKey, recipientSecKey) {
 }
 
 // ======================================================================
-// 4. УПРАВЛЕНИЕ ТОКЕНАМИ
-// ======================================================================
-function getCurrentWindow() {
-  return Math.floor(Date.now() / 1000 / 300);
-}
-function getSecret() {
-  return BASE_SECRET + ':' + secretVersion;
-}
-function generateToken(roomId, windowMinutes) {
-  const data = roomId + ':' + windowMinutes + ':' + getSecret();
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    const ch = data.charCodeAt(i);
-    hash = ((hash << 5) - hash) + ch;
-    hash |= 0;
-  }
-  return 't' + Math.abs(hash).toString(36).substring(0, 8);
-}
-function getValidTokens(roomId) {
-  const cur = getCurrentWindow();
-  return [generateToken(roomId, cur)];
-}
-function isTokenValid(roomId, token) {
-  return getValidTokens(roomId).includes(token);
-}
-function buildInviteLink(roomId, token) {
-  const base = window.location.origin + window.location.pathname;
-  return base + '?room=' + encodeURIComponent(roomId) + '&token=' + encodeURIComponent(token);
-}
-
-// ======================================================================
-// 5. СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+// 4. СОСТОЯНИЕ ПРИЛОЖЕНИЯ
 // ======================================================================
 let currentRoom = null;
-let currentToken = null;
 let peer = null;
 let conn = null;
 let call = null;
 let localStream = null;
 let remoteStream = null;
 let isInitiator = false;
-let timerInterval = null;
 let lifetimeTimer = null;
 let messages = [];
 let hasVideo = false, hasAudio = false;
 let myKeyPair = null;
 let peerPublicKey = null;
 
-// DOM элементы
+// DOM
 const splash = document.getElementById('splashScreen');
 const app = document.getElementById('app');
 const initBlock = document.getElementById('initBlock');
@@ -594,25 +380,22 @@ const chatInput = document.getElementById('chatInput');
 const sendChatBtn = document.getElementById('sendChatBtn');
 const fileInput = document.getElementById('fileInput');
 const inviteLink = document.getElementById('inviteLink');
-const timerDisplay = document.getElementById('timerDisplay');
 const createRoomBtn = document.getElementById('createRoomBtn');
 const joinRoomBtn = document.getElementById('joinRoomBtn');
 const joinPanel = document.getElementById('joinPanel');
 const roomInput = document.getElementById('roomInput');
-const tokenInput = document.getElementById('tokenInput');
 const doJoinBtn = document.getElementById('doJoinBtn');
 const testDeviceBtn = document.getElementById('testDeviceBtn');
 const toggleAudioBtn = document.getElementById('toggleAudioBtn');
 const toggleVideoBtn = document.getElementById('toggleVideoBtn');
 const hangupBtn = document.getElementById('hangupBtn');
 const copyLinkBtn = document.getElementById('copyLinkBtn');
-const refreshLinkBtn = document.getElementById('refreshLinkBtn');
 const exitRoomBtn = document.getElementById('exitRoomBtn');
 const emojiToggleBtn = document.getElementById('emojiToggleBtn');
 const emojiPicker = document.getElementById('emojiPicker');
 
 // ======================================================================
-// 6. ВСПОМОГАТЕЛЬНЫЕ
+// 5. ВСПОМОГАТЕЛЬНЫЕ
 // ======================================================================
 function addMessage(sender, content, mediaType = 'text', timestamp = Date.now()) {
   const div = document.createElement('div');
@@ -646,7 +429,7 @@ function loadHistoryFromFirestore() {
 }
 
 // ======================================================================
-// 7. ПРОВЕРКА УСТРОЙСТВ
+// 6. ПРОВЕРКА УСТРОЙСТВ
 // ======================================================================
 async function testDevices() {
   statusInit.textContent = '🔍 Проверка устройств...';
@@ -661,7 +444,7 @@ async function testDevices() {
 }
 
 // ======================================================================
-// 8. ЗАПУСК МЕДИА (отказоустойчиво)
+// 7. ЗАПУСК МЕДИА (отказоустойчиво)
 // ======================================================================
 async function getMedia() {
   try {
@@ -692,7 +475,7 @@ async function getMedia() {
 }
 
 // ======================================================================
-// 9. ПОКАЗАТЬ/СКРЫТЬ БЛОКИ
+// 8. ПОКАЗАТЬ/СКРЫТЬ БЛОКИ
 // ======================================================================
 function showCallBlock() {
   initBlock.style.display = 'none';
@@ -716,7 +499,7 @@ function hideCallBlock() {
 }
 
 // ======================================================================
-// 10. СОЗДАНИЕ КОМНАТЫ
+// 9. СОЗДАНИЕ КОМНАТЫ
 // ======================================================================
 async function createRoom() {
   try {
@@ -757,13 +540,11 @@ async function createRoom() {
       console.log('Входящий звонок от:', incomingCall.peer);
       if (call) {
         console.warn('Звонок уже активен, отклоняем новый');
-        incomingCall.answer(); // отклоним без потока
-        return;
+        incomingCall.answer(); return;
       }
       if (!localStream) {
         console.error('Нет локального потока для ответа');
-        incomingCall.answer();
-        return;
+        incomingCall.answer(); return;
       }
       call = incomingCall;
       call.answer(localStream);
@@ -772,7 +553,6 @@ async function createRoom() {
         remoteStream = remote;
         remoteVideo.srcObject = remote;
         statusDisplay.textContent = '📞 Товарищ на связи!';
-        // Проверяем наличие треков
         console.log('Удалённый поток треков:', remote.getTracks().length);
         if (remote.getAudioTracks().length === 0) statusDisplay.textContent += ' (без аудио)';
         if (remote.getVideoTracks().length === 0) statusDisplay.textContent += ' (без видео)';
@@ -789,12 +569,14 @@ async function createRoom() {
       });
     });
 
+    // Ссылка без токена
+    const link = window.location.origin + window.location.pathname + '?room=' + encodeURIComponent(roomId);
+    inviteLink.href = link;
+    inviteLink.textContent = link;
+
     showCallBlock();
-    updateInviteUI();
-    startTimer();
     statusDisplay.textContent = '⏳ Ожидаем подключения товарища...';
     statusInit.textContent = 'Готов к связи';
-    startLifetimeTimer();
 
   } catch (err) {
     console.error(err);
@@ -803,16 +585,12 @@ async function createRoom() {
 }
 
 // ======================================================================
-// 11. ПРИСОЕДИНЕНИЕ К КОМНАТЕ
+// 10. ПРИСОЕДИНЕНИЕ К КОМНАТЕ
 // ======================================================================
-async function joinRoom(roomId, token) {
+async function joinRoom(roomId) {
   try {
-    if (!roomId || !token) {
-      statusInit.textContent = '❌ Введите ID и токен.';
-      return;
-    }
-    if (!isTokenValid(roomId, token)) {
-      statusInit.textContent = '❌ Недействительная ссылка. Попросите товарища обновить приглашение.';
+    if (!roomId) {
+      statusInit.textContent = '❌ Введите ID комнаты.';
       return;
     }
     currentRoom = roomId;
@@ -871,7 +649,7 @@ async function joinRoom(roomId, token) {
     });
 
     showCallBlock();
-    document.getElementById('inviteArea').classList.remove('active');
+    document.getElementById('inviteArea').classList.remove('active'); // скрываем приглашение для входящего
     statusDisplay.textContent = '⏳ Устанавливаем соединение...';
     statusInit.textContent = 'Готов к связи';
 
@@ -882,7 +660,7 @@ async function joinRoom(roomId, token) {
 }
 
 // ======================================================================
-// 12. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ
+// 11. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ
 // ======================================================================
 function handleIncomingData(data) {
   try {
@@ -907,7 +685,7 @@ function handleIncomingData(data) {
 }
 
 // ======================================================================
-// 13. ОТПРАВКА СООБЩЕНИЯ (с шифрованием)
+// 12. ОТПРАВКА СООБЩЕНИЯ (с шифрованием)
 // ======================================================================
 function sendMessage(text, mediaType = 'text', fileData = null) {
   if (!conn) {
@@ -926,50 +704,7 @@ function sendMessage(text, mediaType = 'text', fileData = null) {
 }
 
 // ======================================================================
-// 14. ТАЙМЕР ОБНОВЛЕНИЯ ТОКЕНА
-// ======================================================================
-function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  function update() {
-    const now = Date.now();
-    const msInWindow = 300000;
-    const windowStart = Math.floor(now / msInWindow) * msInWindow;
-    const nextChange = windowStart + msInWindow;
-    const diff = nextChange - now;
-    if (diff <= 0) { updateInviteUI(); setTimeout(update, 100); return; }
-    const mins = Math.floor(diff / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    timerDisplay.textContent = `(до смены: ${mins}:${secs.toString().padStart(2, '0')})`;
-  }
-  update();
-  timerInterval = setInterval(update, 1000);
-}
-
-function updateInviteUI() {
-  if (!currentRoom) return;
-  const token = generateToken(currentRoom, getCurrentWindow());
-  currentToken = token;
-  const link = buildInviteLink(currentRoom, token);
-  inviteLink.href = link;
-  inviteLink.textContent = link;
-}
-
-// ======================================================================
-// 15. ТАЙМЕР ЖИЗНИ КОМНАТЫ (пользователи не вылетают)
-// ======================================================================
-function startLifetimeTimer() {
-  if (lifetimeTimer) clearTimeout(lifetimeTimer);
-  const lifetime = 15 * 60000; // 15 минут
-  lifetimeTimer = setTimeout(() => {
-    statusDisplay.textContent = '⏰ Время комнаты истекло. Новые подключения невозможны.';
-    secretVersion++;
-    updateInviteUI();
-    startTimer();
-  }, lifetime);
-}
-
-// ======================================================================
-// 16. ВЫХОД ИЗ КОМНАТЫ
+// 13. ВЫХОД ИЗ КОМНАТЫ
 // ======================================================================
 function exitRoom() {
   if (call) { call.close(); call = null; }
@@ -982,7 +717,6 @@ function exitRoom() {
   remoteVideo.srcObject = null;
   localVideo.srcObject = null;
   hideCallBlock();
-  if (timerInterval) clearInterval(timerInterval);
   if (lifetimeTimer) clearTimeout(lifetimeTimer);
   chatMessages.innerHTML = '';
   messages = [];
@@ -993,28 +727,23 @@ function exitRoom() {
 }
 
 // ======================================================================
-// 17. ПОЛНОЭКРАННЫЙ РЕЖИМ ПО ДВОЙНОМУ ТАПУ
+// 14. ПОЛНОЭКРАННЫЙ РЕЖИМ
 // ======================================================================
 function toggleFullscreen(videoElement) {
   if (!document.fullscreenElement) {
     videoElement.requestFullscreen().catch(err => {
-      // если браузер не поддерживает fullscreen, попробуем через webkit
-      if (videoElement.webkitRequestFullscreen) {
-        videoElement.webkitRequestFullscreen();
-      }
+      if (videoElement.webkitRequestFullscreen) videoElement.webkitRequestFullscreen();
     });
   } else {
     if (document.exitFullscreen) document.exitFullscreen();
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
   }
 }
-
-// Добавляем обработчики двойного клика на видео
 localVideo.addEventListener('dblclick', () => toggleFullscreen(localVideo));
 remoteVideo.addEventListener('dblclick', () => toggleFullscreen(remoteVideo));
 
 // ======================================================================
-// 18. ОБРАБОТЧИКИ ИНТЕРФЕЙСА
+// 15. ОБРАБОТЧИКИ ИНТЕРФЕЙСА
 // ======================================================================
 createRoomBtn.addEventListener('click', createRoom);
 
@@ -1024,8 +753,7 @@ joinRoomBtn.addEventListener('click', () => {
 
 doJoinBtn.addEventListener('click', () => {
   const room = roomInput.value.trim();
-  const token = tokenInput.value.trim();
-  joinRoom(room, token);
+  joinRoom(room);
 });
 
 testDeviceBtn.addEventListener('click', testDevices);
@@ -1071,13 +799,6 @@ copyLinkBtn.addEventListener('click', () => {
   }
 });
 
-refreshLinkBtn.addEventListener('click', () => {
-  secretVersion++;
-  updateInviteUI();
-  startTimer();
-  statusDisplay.textContent = '🔄 Ссылка обновлена, старая более недействительна!';
-});
-
 exitRoomBtn.addEventListener('click', exitRoom);
 
 sendChatBtn.addEventListener('click', () => {
@@ -1120,7 +841,7 @@ emojiPicker.addEventListener('click', (e) => {
 });
 
 // ======================================================================
-// 19. АВТОВХОД ПО ССЫЛКЕ И ЗАГРУЗКА
+// 16. АВТОВХОД ПО ССЫЛКЕ И ЗАГРУЗКА
 // ======================================================================
 window.addEventListener('load', () => {
   setTimeout(() => {
@@ -1130,13 +851,12 @@ window.addEventListener('load', () => {
 
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
-  const token = params.get('token');
-  if (room && token) {
-    setTimeout(() => joinRoom(room, token), 800);
+  if (room) {
+    setTimeout(() => joinRoom(room), 800);
   }
 });
 
-console.log('Secure Chat загружен. Создайте комнату или присоединитесь по ссылке.');
+console.log('Secure Chat загружен. Создайте комнату или перейдите по ссылке с параметром ?room=ID');
 </script>
 </body>
 </html>
