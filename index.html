@@ -4,32 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Простой Чат с Ссылкой</title>
-  <!-- Подключаем библиотека PeerJS -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: sans-serif; margin: 0; padding: 0; }
     body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f2f5; }
     .chat-card { width: 100%; max-width: 450px; height: 600px; background: #fff; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
     
-    /* Шапка */
     .header { padding: 15px; background: #007bff; color: white; display: flex; justify-content: space-between; align-items: center; }
     .header h3 { font-size: 18px; }
     .call-btn { background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 20px; cursor: pointer; font-weight: bold; }
     .call-btn:hover { background: #218838; }
 
-    /* Панель приглашения */
     .invite-bar { padding: 10px; background: #e9ecef; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #ddd; }
     .invite-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
     .invite-btn { padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex-shrink: 0; }
 
-    /* Сообщения */
     .messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
     .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; word-break: break-word; font-size: 14px; }
     .msg.my { align-self: flex-end; background: #007bff; color: white; }
     .msg.peer { align-self: flex-start; background: #e4e6eb; color: #000; }
     .msg.system { align-self: center; background: #fff3cd; color: #856404; font-size: 12px; }
 
-    /* Форма и Эмодзи */
     .footer { padding: 10px; display: flex; gap: 8px; border-top: 1px solid #eee; align-items: center; }
     .footer input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
     .emoji-btn, .send-btn { background: none; border: none; font-size: 20px; cursor: pointer; }
@@ -42,22 +37,18 @@
 <body>
 
 <div class="chat-card">
-  <!-- Шапка -->
   <div class="header">
     <h3>Чат</h3>
     <button class="call-btn" onclick="startCall()">📞 Позвонить</button>
   </div>
 
-  <!-- Панель со ссылкой -->
   <div class="invite-bar">
-    <span id="status-text">Создание комнаты...</span>
+    <span id="status-text">Инициализация...</span>
     <button class="invite-btn" onclick="copyInviteLink()">📋 Ссылка</button>
   </div>
 
-  <!-- Сообщения -->
   <div class="messages" id="messages"></div>
 
-  <!-- Панель Эмодзи -->
   <div class="emoji-picker" id="emoji-picker">
     <span onclick="addEmoji('😀')">😀</span>
     <span onclick="addEmoji('😂')">😂</span>
@@ -66,7 +57,6 @@
     <span onclick="addEmoji('🔥')">🔥</span>
   </div>
 
-  <!-- Ввод -->
   <div class="footer">
     <button class="emoji-btn" onclick="toggleEmoji()">😊</button>
     <input type="text" id="message-input" placeholder="Сообщение..." onkeydown="if(event.key==='Enter') sendMessage()">
@@ -77,35 +67,68 @@
 <audio id="remote-audio" autoplay></audio>
 
 <script>
-  const peer = new Peer();
+  // Используем надежные публичные STUN-серверы Google для пробития NAT/файрволов
+  const peer = new Peer({
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
   let conn = null;
   let targetPeerId = null;
 
-  // Инициализация при открытии страницы
   peer.on('open', (id) => {
-    // Проверяем, есть ли ID в адресе ссылки (#peerId)
     const remoteId = window.location.hash.substring(1);
-
-    if (remoteId) {
-      // Зашли по ссылке — автоматически подключаемся
+    if (remoteId && remoteId !== id) {
       targetPeerId = remoteId;
-      document.getElementById('status-text').innerText = 'Подключение...';
+      document.getElementById('status-text').innerText = 'Подключение к комнате...';
       connectToPeer(remoteId);
     } else {
-      // Зашли просто так — создаем свою комнату
       document.getElementById('status-text').innerText = 'Готов к подключению';
     }
   });
 
-  // Прием входящего подключения чата
+  // Прием входящего подключения
   peer.on('connection', (c) => {
     conn = c;
     targetPeerId = c.peer;
-    setupChat();
-    appendMessage('Собеседник подключился!', 'system');
+    bindConnectionEvents();
   });
 
-  // Прием входящего аудиовызова
+  // Автоматическое подключение
+  function connectToPeer(remoteId) {
+    conn = peer.connect(remoteId, { reliable: true });
+    bindConnectionEvents();
+  }
+
+  // Привязка событий соединения
+  function bindConnectionEvents() {
+    if (!conn) return;
+
+    conn.on('open', () => {
+      document.getElementById('status-text').innerText = 'В сети ✅';
+      appendMessage('Соединение установлено!', 'system');
+    });
+
+    conn.on('data', (data) => {
+      appendMessage(data, 'peer');
+    });
+
+    conn.on('close', () => {
+      document.getElementById('status-text').innerText = 'Собеседник отключился';
+      appendMessage('Собеседник вышел из чата', 'system');
+      conn = null;
+    });
+
+    conn.on('error', (err) => {
+      console.error("Ошибка связи:", err);
+      document.getElementById('status-text').innerText = 'Ошибка подключения!';
+    });
+  }
+
   peer.on('call', async (call) => {
     if (confirm("Входящий голосовой вызов! Ответить?")) {
       try {
@@ -120,40 +143,27 @@
     }
   });
 
-  // Авто-подключение к создателю комнаты
-  function connectToPeer(remoteId) {
-    conn = peer.connect(remoteId);
-    setupChat();
-  }
-
-  function setupChat() {
-    conn.on('open', () => {
-      document.getElementById('status-text').innerText = 'В сети ✅';
-    });
-    conn.on('data', (data) => {
-      appendMessage(data, 'peer');
-    });
-  }
-
-  // Копирование пригласительной ссылки
   function copyInviteLink() {
-    if (!peer.id) return alert("Сеть еще не готова!");
-    const link = `${window.location.origin}${window.location.pathname}#${peer.id}`;
+    if (!peer.id) return alert("Сеть еще не готова! Подождите секунду.");
+    // Формируем прямую ссылку без повторения хэшей
+    const baseUrl = window.location.href.split('#')[0];
+    const link = `${baseUrl}#${peer.id}`;
+    
     navigator.clipboard.writeText(link).then(() => {
       alert("Ссылка скопирована! Отправьте её собеседнику.");
     });
   }
 
-  // Отправка сообщений
   function sendMessage() {
     const input = document.getElementById('message-input');
     const text = input.value.trim();
-    if (text && conn) {
+    
+    if (text && conn && conn.open) {
       conn.send(text);
       appendMessage(text, 'my');
       input.value = '';
-    } else if (!conn) {
-      alert("Ожидаем подключения собеседника по ссылке");
+    } else if (!conn || !conn.open) {
+      alert("Собеседник еще не подключен или соединение разорвано.");
     }
   }
 
@@ -166,10 +176,9 @@
     container.scrollTop = container.scrollHeight;
   }
 
-  // Аудиозвонок
   async function startCall() {
     if (!targetPeerId) {
-      alert("Нет подключенного собеседника для звонка!");
+      alert("Нет подключенного собеседника!");
       return;
     }
     try {
