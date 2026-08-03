@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>🔒 Secure Chat</title>
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <!-- tweetnacl + util -->
@@ -36,7 +36,6 @@
       overflow: hidden;
       position: relative;
     }
-    /* Главный экран */
     #home {
       display: flex;
       flex-direction: column;
@@ -66,10 +65,7 @@
     .btn:active { transform: scale(0.98); }
     .btn-secondary { background: #e2e8f0; color: #1e293b; }
     .btn-secondary:hover { background: #cbd5e1; }
-    .btn-danger { background: #ef4444; }
-    .btn-danger:hover { background: #dc2626; }
 
-    /* Чат */
     #chat { display: none; flex-direction: column; height: 100%; }
     #header {
       padding: 16px 20px;
@@ -136,11 +132,7 @@
       margin-top: 2px;
       text-align: right;
     }
-    .msg-audio {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .msg-audio { display: flex; align-items: center; gap: 8px; }
     .msg-audio audio { max-width: 180px; height: 30px; }
 
     #input-area {
@@ -188,14 +180,11 @@
     }
     #input-area .icon-btn:hover { background: #f1f5f9; }
 
-    /* Видео-звонок */
     #call-container {
       display: none;
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       background: rgba(0,0,0,0.85);
       flex-direction: column;
       justify-content: center;
@@ -203,34 +192,18 @@
       z-index: 10;
     }
     #call-container video {
-      width: 100%;
-      max-width: 400px;
+      width: 100%; max-width: 400px;
       background: #1e293b;
-      border-radius: 12px;
-      margin: 10px;
+      border-radius: 12px; margin: 10px;
     }
-    #call-controls {
-      display: flex;
-      gap: 20px;
-      margin-top: 20px;
-    }
+    #call-controls { display: flex; gap: 20px; margin-top: 20px; }
     #call-controls button {
-      background: #ef4444;
-      border: none;
-      color: white;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      font-size: 1.5rem;
-      cursor: pointer;
-      transition: background 0.2s;
+      background: #ef4444; border: none; color: white;
+      border-radius: 50%; width: 60px; height: 60px;
+      font-size: 1.5rem; cursor: pointer; transition: background 0.2s;
     }
     #call-controls button:hover { background: #dc2626; }
-    #call-container .call-info {
-      color: white;
-      font-size: 1.2rem;
-      margin-bottom: 20px;
-    }
+    #call-container .call-info { color: white; font-size: 1.2rem; margin-bottom: 20px; }
 
     @media (max-width: 480px) {
       #app { border-radius: 0; max-height: 100vh; }
@@ -279,7 +252,6 @@
 </div>
 
 <script>
-<script>
 // ============================ НАСТРОЙКА FIREBASE ============================
 const firebaseConfig = {
   apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
@@ -291,13 +263,10 @@ const firebaseConfig = {
   measurementId: "G-H616TJEYXC"
 };
 
-// Инициализация Firebase (используем Compat API)
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 const db = firebase.firestore();
-
-// Отключаем или мягко обрабатываем персистентность
 db.enablePersistence({ synchronizeTabs: true }).catch(err => console.warn('Persistence warning:', err.message));
 
 // ============================ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============================
@@ -306,9 +275,9 @@ let myName = '';
 let myKeyPair = null;
 let participants = {};      
 let messages = [];
+let localPlainMessages = {}; // Локальный словарь собственных отправленных сообщений по ID
 let peer = null;
 let localStream = null;
-let remoteStream = null;
 let isCallActive = false;
 let callType = null;
 let mediaRecorder = null;
@@ -323,7 +292,7 @@ let unsubscribeMessages = null;
 let unsubscribeParticipants = null;
 let unsubscribeSignals = null;
 
-// DOM
+// DOM Элементы
 const home = document.getElementById('home');
 const chat = document.getElementById('chat');
 const messagesDiv = document.getElementById('messages');
@@ -396,7 +365,7 @@ function generateUserId() {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
 
-// ============================ РАБОТА С КОМНАТОЙ ============================
+// ============================ ВХОД В КОМНАТУ ============================
 async function enterRoom(roomIdParam) {
   roomId = roomIdParam;
   myUserId = generateUserId();
@@ -467,10 +436,8 @@ function renderMessages() {
 
     let decryptedText = null;
 
-    // Если сообщение отправлено мной, мы храним его либо открыто локально, 
-    // либо расшифровываем с использованием собственного ключа (в зависимости от вашей логики)
-    if (isOwn && msg.plainText) {
-      decryptedText = msg.plainText;
+    if (isOwn) {
+      decryptedText = localPlainMessages[msg.id];
     } else {
       try {
         const senderCryptoKey = participants[msg.senderId]?.publicKey;
@@ -496,7 +463,7 @@ function renderMessages() {
         audio.style.maxWidth = '180px';
         audioContainer.appendChild(audio);
       } else {
-        audioContainer.textContent = '🔒 Зашифровано';
+        audioContainer.textContent = '🔒 Зашифрованное аудио';
       }
       div.appendChild(audioContainer);
     } else {
@@ -528,14 +495,15 @@ async function sendTextMessage(text) {
 
   const encrypted = encryptMessage(text, recipientPublicKey, myKeyPair.secretKey);
   
-  // Сохраняем сообщение
-  await messagesRef.add({
+  const docRef = await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
     encryptedMessage: JSON.stringify(encrypted),
     type: 'text',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
+  
+  localPlainMessages[docRef.id] = text;
   
   msgInput.value = '';
   msgInput.focus();
@@ -552,16 +520,18 @@ async function sendAudioMessage(base64Audio) {
   if (!recipientPublicKey) return;
 
   const encrypted = encryptMessage(base64Audio, recipientPublicKey, myKeyPair.secretKey);
-  await messagesRef.add({
+  const docRef = await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
     encryptedMessage: JSON.stringify(encrypted),
     type: 'audio',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
+
+  localPlainMessages[docRef.id] = base64Audio;
 }
 
-// ============================ СОБЫТИЯ И ВЫЗОВЫ ============================
+// ============================ ЗАПИСЬ АУДИО И ИВЕНТЫ ============================
 recordBtn.addEventListener('click', async () => {
   if (isRecording) {
     if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
@@ -616,6 +586,7 @@ leaveRoomBtn.addEventListener('click', () => {
   
   participants = {};
   messages = [];
+  localPlainMessages = {};
   roomId = '';
   myUserId = '';
   home.style.display = 'flex';
