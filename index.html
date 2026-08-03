@@ -3,13 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>🔒 Secure Chat</title>
+  <title>Chat App</title>
   <!-- Firebase SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <!-- tweetnacl + util -->
-  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
   <!-- simple-peer -->
   <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
   <style>
@@ -78,7 +75,6 @@
       gap: 8px;
     }
     .btn:hover { background: var(--primary-hover); }
-    .btn-secondary { background: var(--border-color); color: var(--text-main); }
 
     #chat { display: none; flex-direction: column; height: 100%; }
     #header {
@@ -219,6 +215,7 @@
       background: #000;
     }
 
+    /* Звонки */
     #call-container {
       display: none;
       position: absolute;
@@ -241,24 +238,49 @@
       font-size: 1.4rem; cursor: pointer; margin-top: 20px;
     }
     .call-info { color: white; font-size: 1.1rem; margin-bottom: 15px; font-weight: 600; }
+
+    /* Окно входящего звонка */
+    #incoming-call-modal {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 40;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .call-modal-box {
+      background: var(--bg-app);
+      padding: 24px;
+      border-radius: 16px;
+      text-align: center;
+      border: 1px solid var(--border-color);
+    }
+    .call-modal-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .btn-accept { background: #22c55e; color: white; }
+    .btn-reject { background: #ef4444; color: white; }
   </style>
 </head>
 <body>
 <div id="app">
   <div id="home">
-    <h1>🔒 Secure Chat</h1>
-    <p>Зашифрованная комната с паролем в ссылке</p>
-    <button class="btn" id="createRoomBtn">➕ Создать защищенную комнату</button>
-    <div style="margin-top: 25px; font-size: 0.9rem; color: var(--text-muted);">
-      Или войти по ссылке с ключом доступа
-    </div>
+    <h1>💬 Quick Chat</h1>
+    <p>Быстрые комнаты и онлайн-звонки</p>
+    <button class="btn" id="createRoomBtn">➕ Создать комнату</button>
   </div>
 
   <div id="chat">
     <div id="header">
       <h2 id="roomTitle">Комната</h2>
       <div id="header-actions">
-        <button id="copyLinkBtn" title="Скопировать ссылку с паролем">🔗</button>
+        <button id="copyLinkBtn" title="Скопировать ссылку">🔗</button>
         <button id="audioCallBtn" title="Аудиозвонок">📞</button>
         <button id="videoCallBtn" title="Видеозвонок">📹</button>
         <button id="leaveRoomBtn" title="Выйти">✕</button>
@@ -296,6 +318,16 @@
       <button id="hangupBtn">📴</button>
     </div>
   </div>
+
+  <div id="incoming-call-modal">
+    <div class="call-modal-box">
+      <h3 id="incomingCallText" style="margin-bottom:10px;">Входящий звонок</h3>
+      <div class="call-modal-actions">
+        <button class="btn btn-accept" id="acceptCallBtn">📞 Ответить</button>
+        <button class="btn btn-reject" id="rejectCallBtn">📴 Отклонить</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -318,7 +350,6 @@ const db = firebase.firestore();
 
 // ============================ СОСТОЯНИЯ ЧАТА ============================
 let roomId = '';
-let roomSecretPass = '';
 let myName = '';
 let myUserId = '';
 
@@ -337,6 +368,7 @@ let participants = {};
 let peer = null;
 let localStream = null;
 let isCallActive = false;
+let pendingCallData = null;
 
 let mediaRecorder = null;
 let audioChunks = [];
@@ -348,7 +380,7 @@ let videoNoteStream = null;
 let videoNoteTimerInterval = null;
 let videoNoteSecondsLeft = 15;
 
-// DOM Элементы
+// DOM
 const home = document.getElementById('home');
 const chat = document.getElementById('chat');
 const messagesDiv = document.getElementById('messages');
@@ -372,6 +404,11 @@ const remoteAudio = document.getElementById('remoteAudio');
 const hangupBtn = document.getElementById('hangupBtn');
 const callInfo = document.getElementById('callInfo');
 
+const incomingCallModal = document.getElementById('incoming-call-modal');
+const incomingCallText = document.getElementById('incomingCallText');
+const acceptCallBtn = document.getElementById('acceptCallBtn');
+const rejectCallBtn = document.getElementById('rejectCallBtn');
+
 const videoNoteModal = document.getElementById('video-note-preview-modal');
 const videoNotePreview = document.getElementById('video-note-preview');
 const videoNoteTimer = document.getElementById('videoNoteTimer');
@@ -388,46 +425,15 @@ function generateUserId() {
   return 'usr_' + Math.random().toString(36).substring(2, 9);
 }
 
-function generatePasscode() {
-  return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
-}
-
-// Простая симметричная XOR-кодировка с паролем комнаты для лёгкой передачи в базах
-function encryptText(text, pass) {
-  try {
-    let result = '';
-    for (let i = 0; i < text.length; i++) {
-      result += String.fromCharCode(text.charCodeAt(i) ^ pass.charCodeAt(i % pass.length));
-    }
-    return btoa(unescape(encodeURIComponent(result)));
-  } catch (e) {
-    return text;
-  }
-}
-
-function decryptText(cipher, pass) {
-  try {
-    const text = decodeURIComponent(escape(atob(cipher)));
-    let result = '';
-    for (let i = 0; i < text.length; i++) {
-      result += String.fromCharCode(text.charCodeAt(i) ^ pass.charCodeAt(i % pass.length));
-    }
-    return result;
-  } catch (e) {
-    return null;
-  }
-}
-
 function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-// ============================ ВХОД И ВЫХОД ИЗ КОМНАТЫ ============================
-async function enterRoom(roomIdParam, passParam) {
+// ============================ ВХОД И ВЫХОД ============================
+async function enterRoom(roomIdParam) {
   roomId = roomIdParam;
-  roomSecretPass = passParam;
   myUserId = generateUserId();
   myName = generateRandomName();
 
@@ -436,13 +442,11 @@ async function enterRoom(roomIdParam, passParam) {
   participantsRef = roomRef.collection('participants');
   signalRef = roomRef.collection('signals');
 
-  // Добавляем себя в базу участников
   await participantsRef.doc(myUserId).set({
     name: myName,
     joinedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  // Отслеживаем список участников
   unsubscribeParticipants = participantsRef.onSnapshot(snapshot => {
     participants = {};
     snapshot.forEach(doc => {
@@ -452,7 +456,6 @@ async function enterRoom(roomIdParam, passParam) {
     roomTitle.textContent = `Комната (${count})`;
   });
 
-  // Слушаем сообщения и устраняем дубликаты
   unsubscribeMessages = messagesRef.orderBy('createdAt', 'asc').onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
@@ -465,8 +468,6 @@ async function enterRoom(roomIdParam, passParam) {
     });
   });
 
-  // Слушаем сигналы WebRTC звонков
-  const startTime = Date.now();
   unsubscribeSignals = signalRef.where('target', '==', myUserId).onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
@@ -477,15 +478,13 @@ async function enterRoom(roomIdParam, passParam) {
     });
   });
 
-  // Формируем безопасный хэш ссылок: #ROOM_ID:SECRET_PASS
-  window.location.hash = `${roomId}:${roomSecretPass}`;
+  window.location.hash = `${roomId}`;
 
   home.style.display = 'none';
   chat.style.display = 'flex';
   msgInput.focus();
 }
 
-// Автоматический вылет при закрытии браузера/вкладки
 window.addEventListener('beforeunload', () => {
   if (participantsRef && myUserId) {
     participantsRef.doc(myUserId).delete();
@@ -503,7 +502,6 @@ function leaveRoom() {
   processedMsgIds.clear();
   participants = {};
   roomId = '';
-  roomSecretPass = '';
   myUserId = '';
 
   hangupCall();
@@ -517,14 +515,13 @@ leaveRoomBtn.addEventListener('click', leaveRoom);
 
 createRoomBtn.addEventListener('click', () => {
   const newRoomId = Math.random().toString(36).substring(2, 8);
-  const newSecretPass = generatePasscode();
-  enterRoom(newRoomId, newSecretPass);
+  enterRoom(newRoomId);
 });
 
 copyLinkBtn.addEventListener('click', () => {
-  const fullLink = `${window.location.origin}${window.location.pathname}#${roomId}:${roomSecretPass}`;
+  const fullLink = `${window.location.origin}${window.location.pathname}#${roomId}`;
   navigator.clipboard.writeText(fullLink);
-  alert('Защищенная ссылка с паролем скопирована!');
+  alert('Ссылка на комнату скопирована!');
 });
 
 // ============================ ОТРИСОВКА СООБЩЕНИЙ ============================
@@ -538,36 +535,28 @@ function renderSingleMessage(id, msg) {
   nameSpan.textContent = isOwn ? 'Вы' : (msg.senderName || 'Участник');
   div.appendChild(nameSpan);
 
-  const decryptedContent = decryptText(msg.encryptedData, roomSecretPass);
+  const content = msg.content || '';
 
   if (msg.type === 'audio') {
     const audioContainer = document.createElement('div');
     audioContainer.className = 'msg-audio';
-    if (decryptedContent) {
-      const audio = document.createElement('audio');
-      audio.controls = true;
-      audio.src = decryptedContent;
-      audioContainer.appendChild(audio);
-    } else {
-      audioContainer.textContent = '🔒 Ошибка ключа доступа';
-    }
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = content;
+    audioContainer.appendChild(audio);
     div.appendChild(audioContainer);
   } else if (msg.type === 'videoNote') {
     const videoContainer = document.createElement('div');
     videoContainer.className = 'msg-video-note';
-    if (decryptedContent) {
-      const video = document.createElement('video');
-      video.controls = true;
-      video.playsInline = true;
-      video.src = decryptedContent;
-      videoContainer.appendChild(video);
-    } else {
-      videoContainer.textContent = '🔒 Ошибка ключа доступа';
-    }
+    const video = document.createElement('video');
+    video.controls = true;
+    video.playsInline = true;
+    video.src = content;
+    videoContainer.appendChild(video);
     div.appendChild(videoContainer);
   } else {
     const textSpan = document.createElement('div');
-    textSpan.textContent = decryptedContent || '🔒 Не удалось расшифровать';
+    textSpan.textContent = content;
     div.appendChild(textSpan);
   }
 
@@ -583,12 +572,11 @@ function renderSingleMessage(id, msg) {
 // ============================ ОТПРАВКА СООБЩЕНИЙ ============================
 async function sendTextMessage(text) {
   if (!text.trim() || !roomId) return;
-  const cipher = encryptText(text, roomSecretPass);
 
   await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
-    encryptedData: cipher,
+    content: text,
     type: 'text',
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
@@ -600,12 +588,11 @@ async function sendTextMessage(text) {
 
 async function sendMediaMessage(base64Data, type) {
   if (!roomId) return;
-  const cipher = encryptText(base64Data, roomSecretPass);
 
   await messagesRef.add({
     senderId: myUserId,
     senderName: myName,
-    encryptedData: cipher,
+    content: base64Data,
     type: type,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
@@ -614,7 +601,6 @@ async function sendMediaMessage(base64Data, type) {
 sendBtn.addEventListener('click', () => sendTextMessage(msgInput.value));
 msgInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendTextMessage(msgInput.value); });
 
-// Эмодзи
 emojiBtn.addEventListener('click', () => {
   emojiPicker.style.display = emojiPicker.style.display === 'flex' ? 'none' : 'flex';
 });
@@ -653,12 +639,11 @@ recordBtn.addEventListener('click', async () => {
   }
 });
 
-// ============================ ОПТИМИЗИРОВАННЫЕ ВИДЕО КРУЖКИ ============================
+// ============================ ВИДЕО КРУЖКИ ============================
 async function startVideoNoteRecording() {
   closeVideoNoteModal();
 
   try {
-    // Низкие настройки разрешения и битрейта, чтобы не привысить лимит базы Firestore (1MB)
     videoNoteStream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: { width: 240, height: 240, frameRate: 15 }
@@ -725,20 +710,33 @@ function stopVideoNoteRecording() {
 videoNoteBtn.addEventListener('click', startVideoNoteRecording);
 stopVideoNoteBtn.addEventListener('click', stopVideoNoteRecording);
 
-// ============================ WEBRTC АУДИО И ВИДЕО ЗВОНКИ ============================
+// ============================ WEBRTC ЗВОНКИ ============================
 function handleIncomingSignal(data) {
   const { signal, from, fromName, callType } = data;
+
   if (!isCallActive && !peer) {
+    pendingCallData = data;
     const isVideo = callType === 'video';
-    setTimeout(() => {
-      if (confirm(`Входящий ${isVideo ? 'видеозвонок' : 'аудиозвонок'} от ${fromName}. Ответить?`)) {
-        startPeerConnection(false, from, isVideo, signal);
-      }
-    }, 100);
+    incomingCallText.textContent = `Входящий ${isVideo ? 'видеозвонок' : 'аудиозвонок'} от ${fromName || 'участника'}`;
+    incomingCallModal.style.display = 'flex';
   } else if (peer) {
     try { peer.signal(signal); } catch(e) {}
   }
 }
+
+acceptCallBtn.addEventListener('click', () => {
+  incomingCallModal.style.display = 'none';
+  if (pendingCallData) {
+    const { from, callType, signal } = pendingCallData;
+    startPeerConnection(false, from, callType === 'video', signal);
+    pendingCallData = null;
+  }
+});
+
+rejectCallBtn.addEventListener('click', () => {
+  incomingCallModal.style.display = 'none';
+  pendingCallData = null;
+});
 
 async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomingSignal = null) {
   if (peer) hangupCall();
@@ -785,7 +783,7 @@ async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomin
     remoteAudio.play().catch(() => {});
   });
 
-  peer.on('error', () => hangupCall());
+  peer.on('error', err => console.error('Peer error:', err));
   peer.on('close', () => hangupCall());
 
   if (incomingSignal) {
@@ -794,11 +792,14 @@ async function startPeerConnection(isInitiator, targetUserId, wantVideo, incomin
 
   isCallActive = true;
   callContainer.style.display = 'flex';
-  callInfo.textContent = isInitiator ? 'Звоним собеседнику...' : 'Разговор зашифрован';
+  callInfo.textContent = isInitiator ? 'Звоним собеседнику...' : 'Идет разговор';
 }
 
 function hangupCall() {
   isCallActive = false;
+  incomingCallModal.style.display = 'none';
+  pendingCallData = null;
+
   if (peer) {
     try { peer.destroy(); } catch(e){}
     peer = null;
@@ -830,9 +831,8 @@ hangupBtn.addEventListener('click', hangupCall);
 // ============================ АВТО-ВХОД ПО ССЫЛКЕ ============================
 window.addEventListener('load', () => {
   const hash = window.location.hash.replace('#', '').trim();
-  if (hash && hash.includes(':')) {
-    const parts = hash.split(':');
-    enterRoom(parts[0], parts[1]);
+  if (hash) {
+    enterRoom(hash);
   }
 });
 </script>
