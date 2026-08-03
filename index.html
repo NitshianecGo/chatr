@@ -10,7 +10,6 @@
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
   <style>
-    /* (стили те же, что и в предыдущей версии, я их не меняю) */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -407,7 +406,7 @@ clearLogBtn.addEventListener('click', () => {
 });
 
 // ======================================================================
-// 1. КОНФИГУРАЦИЯ
+// 1. КОНФИГУРАЦИЯ (Исправленный список STUN/TURN серверов)
 // ======================================================================
 const PEER_OPTIONS = {
   config: {
@@ -420,11 +419,12 @@ const PEER_OPTIONS = {
       { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
       { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
     ]
-  }
+  },
+  debug: 2
 };
 
 // ======================================================================
-// 2. FIREBASE (отключено)
+// 2. FIREBASE
 // ======================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
@@ -434,8 +434,7 @@ const firebaseConfig = {
   messagingSenderId: "901741126959",
   appId: "1:901741126959:web:97734153fa537a5ab16dda"
 };
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+if (typeof firebase !== 'undefined' && !firebase.apps.length) firebase.initializeApp(firebaseConfig);
 
 // ======================================================================
 // 3. ШИФРОВАНИЕ
@@ -526,8 +525,7 @@ function createFakeAudioTrack() {
   gain.connect(audioCtx.destination);
   oscillator.start();
   const stream = audioCtx.createMediaStreamDestination().stream;
-  const audioTrack = stream.getAudioTracks()[0];
-  return audioTrack;
+  return stream.getAudioTracks()[0];
 }
 
 function createFakeVideoTrack(width = 160, height = 120) {
@@ -541,8 +539,7 @@ function createFakeVideoTrack(width = 160, height = 120) {
   ctx.font = '14px sans-serif';
   ctx.fillText('🔒', width/2 - 20, height/2 + 5);
   const stream = canvas.captureStream(1);
-  const videoTrack = stream.getVideoTracks()[0];
-  return videoTrack;
+  return stream.getVideoTracks()[0];
 }
 
 function getFakeStream() {
@@ -597,7 +594,7 @@ async function testDevices() {
 }
 
 // ======================================================================
-// 8. ЗАПУСК МЕДИА (с фейковым потоком)
+// 8. ЗАПУСК МЕДИА
 // ======================================================================
 async function getMedia(retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -607,23 +604,20 @@ async function getMedia(retries = 2) {
       log('info', 'Получен реальный поток с видео и аудио');
       return stream;
     } catch (e1) {
-      log('warn', 'Попытка ' + (attempt+1) + ' видео+аудио не доступны: ' + e1.message);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         hasVideo = false; hasAudio = true;
         log('info', 'Получен реальный поток только с аудио');
         return stream;
       } catch (e2) {
-        log('warn', 'Попытка ' + (attempt+1) + ' аудио не доступно: ' + e2.message);
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
           hasVideo = true; hasAudio = false;
           log('info', 'Получен реальный поток только с видео');
           return stream;
         } catch (e3) {
-          log('warn', 'Попытка ' + (attempt+1) + ' ничего не доступно: ' + e3.message);
           if (attempt === retries) {
-            log('error', 'Все попытки исчерпаны, создаём фейковый поток');
+            log('error', 'Создаём фейковый поток');
             const fakeStream = getFakeStream();
             hasVideo = fakeStream.getVideoTracks().length > 0;
             hasAudio = fakeStream.getAudioTracks().length > 0;
@@ -638,32 +632,33 @@ async function getMedia(retries = 2) {
 }
 
 // ======================================================================
-// 9. НАСТРОЙКА ОБРАБОТЧИКОВ СОЕДИНЕНИЯ (исправлено)
+// 9. НАСТРОЙКА ОБРАБОТЧИКОВ СОЕДИНЕНИЯ (ИСПРАВЛЕНО)
 // ======================================================================
 function setupConnectionHandlers() {
-  // Блокируем интерфейс чата до открытия
+  if (!conn) return;
+
   sendChatBtn.disabled = true;
   chatInput.disabled = true;
   fileBtn.disabled = true;
   fileInput.disabled = true;
   chatInput.placeholder = "Установка соединения...";
 
+  // Обработчик события успешного открытия канала
   conn.on('open', () => {
     log('success', 'DataChannel открыт!');
     statusDisplay.textContent = '✅ Соединение для чата установлено!';
-    // Разблокируем
+    
     sendChatBtn.disabled = false;
     chatInput.disabled = false;
     fileBtn.disabled = false;
     fileInput.disabled = false;
     chatInput.placeholder = "Введите сообщение...";
-    // Отправляем публичный ключ
+
+    // Обмен публичным ключом шифрования
     conn.send(JSON.stringify({ type: 'key', publicKey: myKeyPair.publicKey }));
   });
 
-  conn.on('data', (data) => {
-    handleIncomingData(data);
-  });
+  conn.on('data', handleIncomingData);
 
   conn.on('close', () => {
     log('warn', 'DataChannel закрыт');
@@ -692,7 +687,6 @@ function handleIncomingData(data) {
       try {
         parsed = JSON.parse(data);
       } catch (e) {
-        log('warn', 'Невалидный JSON, считаем как текст: ' + data);
         addMessage('Товарищ', data, 'text');
         return;
       }
@@ -712,23 +706,22 @@ function handleIncomingData(data) {
         if (decrypted) decryptedContent = decrypted;
       }
       addMessage(parsed.sender || 'Товарищ', decryptedContent, parsed.mediaType || 'text', parsed.timestamp);
-      log('info', 'Добавлено сообщение от ' + parsed.sender);
+      log('info', 'Сообщение получено');
       return;
     }
-    log('warn', 'Неизвестный тип данных: ' + parsed.type);
   } catch (e) {
-    log('error', 'Ошибка обработки данных: ' + e.message, e);
+    log('error', 'Ошибка обработки входящих данных: ' + e.message, e);
   }
 }
 
 // ======================================================================
-// 11. ОТПРАВКА СООБЩЕНИЯ (ИСПРАВЛЕНА)
+// 11. ОТПРАВКА СООБЩЕНИЯ (ИСПРАВЛЕНО)
 // ======================================================================
 function sendMessage(text, mediaType = 'text', fileData = null) {
-  // Проверяем наличие объекта и реальный статус WebRTC DataChannel
-  if (!conn || conn.readyState !== 'open') {
-    statusDisplay.textContent = '⚠️ Соединение ещё устанавливается, подождите пару секунд...';
-    log('warn', 'Попытка отправки до открытия conn.readyState = ' + (conn ? conn.readyState : 'null'));
+  // Проверяем наличие соединения и флаг conn.open!
+  if (!conn || !conn.open) {
+    statusDisplay.textContent = '⚠️ Соединение ещё устанавливается, подождите пара секунд...';
+    log('warn', 'Попытка отправки до открытия conn.open');
     return;
   }
 
@@ -753,9 +746,9 @@ function sendMessage(text, mediaType = 'text', fileData = null) {
   };
 
   try {
-    conn.send(JSON.stringify(msg)); // ВАЖНО: отправляем JSON-строку!
+    conn.send(JSON.stringify(msg));
     addMessage('Я', rawContent, mediaType, msg.timestamp);
-    log('info', 'Сообщение отправлено', msg);
+    log('info', 'Сообщение успешно отправлено');
   } catch (e) {
     log('error', 'Ошибка отправки: ' + e.message, e);
     statusDisplay.textContent = '❌ Ошибка отправки: ' + e.message;
@@ -768,38 +761,34 @@ function sendMessage(text, mediaType = 'text', fileData = null) {
 async function createRoom() {
   try {
     statusInit.textContent = '🛠 Создаём комнату...';
+    if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
+
     const roomId = 'chat-' + Math.random().toString(36).substring(2, 10);
     currentRoom = roomId;
     isInitiator = true;
-    log('info', 'Создание комнаты: ' + roomId);
 
     myKeyPair = generateKeyPair();
-    log('info', 'Сгенерирована ключевая пара');
 
     const stream = await getMedia(2);
     localStream = stream;
     if (hasVideo) localVideo.srcObject = stream;
-    log('info', 'Локальный поток создан, треков: ' + localStream.getTracks().length);
 
     peer = new Peer(roomId, PEER_OPTIONS);
     await new Promise((resolve, reject) => {
       peer.on('open', () => resolve());
       peer.on('error', reject);
     });
-    log('success', 'Peer создан с ID: ' + roomId);
 
-    // Обработка входящих DataConnection
     peer.on('connection', (dataConn) => {
-      if (conn) { dataConn.close(); log('warn', 'Новое соединение отклонено, уже есть'); return; }
+      if (conn) { dataConn.close(); return; }
       conn = dataConn;
-      log('info', 'Входящее DataConnection от: ' + dataConn.peer);
-      setupConnectionHandlers(); // настраиваем обработчики для этого conn
+      log('info', 'Принято входящее подключение: ' + dataConn.peer);
+      setupConnectionHandlers();
     });
 
-    // Обработка входящих звонков
     peer.on('call', (incomingCall) => {
-      log('info', 'Входящий звонок от: ' + incomingCall.peer);
-      statusDisplay.textContent = '📞 Входящий звонок! Нажмите "Аудиозвонок" или "Видеозвонок" чтобы ответить.';
+      log('info', 'Входящий звонок');
+      statusDisplay.textContent = '📞 Входящий звонок! Нажмите "Аудиозвонок" или "Видеозвонок"';
       window._pendingCall = incomingCall;
     });
 
@@ -808,9 +797,8 @@ async function createRoom() {
     inviteLink.textContent = link;
 
     showCallBlock();
-    statusDisplay.textContent = '⏳ Ожидаем подключения товарища...';
+    statusDisplay.textContent = '⏳ Ожидаем подключения собеседника...';
     statusInit.textContent = 'Готов к связи';
-    log('success', 'Комната создана, ожидание подключения');
 
   } catch (err) {
     log('error', 'Ошибка создания комнаты: ' + err.message, err);
@@ -827,38 +815,34 @@ async function joinRoom(roomId) {
       statusInit.textContent = '❌ Введите ID комнаты.';
       return;
     }
+    if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
+
     currentRoom = roomId;
     isInitiator = false;
-    log('info', 'Присоединение к комнате: ' + roomId);
 
     myKeyPair = generateKeyPair();
-    log('info', 'Сгенерирована ключевая пара');
 
     const stream = await getMedia(2);
     localStream = stream;
     if (hasVideo) localVideo.srcObject = stream;
-    log('info', 'Локальный поток создан, треков: ' + localStream.getTracks().length);
 
     peer = new Peer(PEER_OPTIONS);
     await new Promise((resolve, reject) => {
       peer.on('open', () => resolve());
       peer.on('error', reject);
     });
-    log('success', 'Peer создан со случайным ID: ' + peer.id);
 
     conn = peer.connect(roomId);
-    log('info', 'Подключение к DataConnection: ' + roomId);
-    setupConnectionHandlers(); // настраиваем обработчики
+    setupConnectionHandlers();
 
     showCallBlock();
     document.getElementById('inviteArea').classList.remove('active');
-    statusDisplay.textContent = '⏳ Соединение установлено, теперь можно позвонить.';
+    statusDisplay.textContent = '⏳ Соединение устанавливается...';
     statusInit.textContent = 'Готов к связи';
-    log('success', 'Присоединение к комнате выполнено');
 
   } catch (err) {
     log('error', 'Ошибка присоединения: ' + err.message, err);
-    statusInit.textContent = '❌ Ошибка: ' + err.message;
+    statusInit.textContent = '❌ Ошибка соединения: ' + err.message;
   }
 }
 
@@ -866,53 +850,31 @@ async function joinRoom(roomId) {
 // 14. ИНИЦИАЦИЯ ЗВОНКА
 // ======================================================================
 function startCall(wantVideo) {
-  if (!peer) {
-    log('error', 'Peer не создан');
-    statusDisplay.textContent = '❌ Нет peer-соединения';
-    return;
-  }
-  if (!currentRoom) {
-    log('error', 'Нет активной комнаты');
-    return;
-  }
-  if (call) {
-    log('warn', 'Звонок уже активен');
-    statusDisplay.textContent = '⚠️ Звонок уже идёт';
-    return;
-  }
-  if (!localStream || localStream.getTracks().length === 0) {
-    log('error', 'Нет локального потока для звонка');
-    statusDisplay.textContent = '❌ Нет медиа-потока';
-    return;
-  }
+  if (!peer || !currentRoom || call) return;
+  if (!localStream) return;
 
-  log('info', 'Инициация ' + (wantVideo ? 'видео' : 'аудио') + 'звонка к комнате ' + currentRoom);
+  log('info', 'Начало звонка...');
   const callObj = peer.call(currentRoom, localStream);
   call = callObj;
 
   call.on('stream', (remote) => {
-    log('info', 'Получен удалённый поток, треков: ' + remote.getTracks().length);
     remoteStream = remote;
     remoteVideo.srcObject = remote;
-    statusDisplay.textContent = '📞 Товарищ на связи!';
-    if (remote.getAudioTracks().length === 0) statusDisplay.textContent += ' (без аудио)';
-    if (remote.getVideoTracks().length === 0) statusDisplay.textContent += ' (без видео)';
+    statusDisplay.textContent = '📞 На связи!';
   });
   call.on('close', () => {
-    log('warn', 'Звонок закрыт');
     remoteVideo.srcObject = null;
-    statusDisplay.textContent = '🔴 Сеанс завершён.';
+    statusDisplay.textContent = '🔴 Звонок завершён.';
     call = null;
   });
   call.on('error', (err) => {
-    log('error', 'Ошибка звонка: ' + err.message, err);
-    statusDisplay.textContent = '❌ Ошибка звонка: ' + err.message;
+    log('error', 'Ошибка звонка: ' + err.message);
     call = null;
   });
 }
 
 // ======================================================================
-// 15. ПОКАЗАТЬ/СКРЫТЬ БЛОКИ
+// 15. УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ И БЛОКАМИ
 // ======================================================================
 function showCallBlock() {
   initBlock.style.display = 'none';
@@ -921,9 +883,8 @@ function showCallBlock() {
   document.getElementById('callControls').classList.add('active');
   document.getElementById('chatArea').classList.add('active');
   document.getElementById('inviteArea').classList.add('active');
-  if (!hasVideo) { localVideo.style.display = 'none'; remoteVideo.style.display = 'none'; }
-  else { localVideo.style.display = 'block'; remoteVideo.style.display = 'block'; }
 }
+
 function hideCallBlock() {
   initBlock.style.display = 'block';
   callBlock.style.display = 'none';
@@ -931,13 +892,8 @@ function hideCallBlock() {
   document.getElementById('callControls').classList.remove('active');
   document.getElementById('chatArea').classList.remove('active');
   document.getElementById('inviteArea').classList.remove('active');
-  localVideo.style.display = 'block';
-  remoteVideo.style.display = 'block';
 }
 
-// ======================================================================
-// 16. ВЫХОД ИЗ КОМНАТЫ
-// ======================================================================
 function exitRoom() {
   if (call) { call.close(); call = null; }
   if (conn) { conn.close(); conn = null; }
@@ -950,13 +906,10 @@ function exitRoom() {
   localVideo.srcObject = null;
   hideCallBlock();
   chatMessages.innerHTML = '';
-  messages = [];
   currentRoom = null;
   peerPublicKey = null;
-  statusDisplay.textContent = '';
   statusInit.textContent = 'Вы вышли из комнаты.';
-  log('info', 'Выход из комнаты');
-  // Блокируем чат
+  
   sendChatBtn.disabled = true;
   chatInput.disabled = true;
   fileBtn.disabled = true;
@@ -965,90 +918,40 @@ function exitRoom() {
 }
 
 // ======================================================================
-// 17. ПОЛНОЭКРАННЫЙ РЕЖИМ
-// ======================================================================
-function toggleFullscreen(videoElement) {
-  if (!document.fullscreenElement) {
-    videoElement.requestFullscreen().catch(err => {
-      if (videoElement.webkitRequestFullscreen) videoElement.webkitRequestFullscreen();
-    });
-  } else {
-    if (document.exitFullscreen) document.exitFullscreen();
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-  }
-}
-localVideo.addEventListener('dblclick', () => toggleFullscreen(localVideo));
-remoteVideo.addEventListener('dblclick', () => toggleFullscreen(remoteVideo));
-
-// ======================================================================
-// 18. ОБРАБОТЧИКИ ИНТЕРФЕЙСА
+// 16. СОБЫТИЯ ЭЛЕМЕНТОВ
 // ======================================================================
 createRoomBtn.addEventListener('click', createRoom);
-
 joinRoomBtn.addEventListener('click', () => {
   joinPanel.style.display = joinPanel.style.display === 'none' ? 'flex' : 'none';
 });
-
-doJoinBtn.addEventListener('click', () => {
-  const room = roomInput.value.trim();
-  joinRoom(room);
-});
-
+doJoinBtn.addEventListener('click', () => joinRoom(roomInput.value.trim()));
 testDeviceBtn.addEventListener('click', testDevices);
-
 audioCallBtn.addEventListener('click', () => startCall(false));
 videoCallBtn.addEventListener('click', () => startCall(true));
+hangupBtn.addEventListener('click', exitRoom);
+exitRoomBtn.addEventListener('click', exitRoom);
 
 toggleAudioBtn.addEventListener('click', () => {
-  if (localStream) {
-    const tracks = localStream.getAudioTracks();
-    if (tracks.length) {
-      const en = !tracks[0].enabled;
-      tracks[0].enabled = en;
-      toggleAudioBtn.textContent = en ? '🔇 Заглушить' : '🔊 Включить';
-      log('info', 'Аудио ' + (en ? 'включено' : 'выключено'));
-    } else {
-      log('warn', 'Нет аудио-треков');
-    }
+  if (localStream && localStream.getAudioTracks().length) {
+    const tr = localStream.getAudioTracks()[0];
+    tr.enabled = !tr.enabled;
+    toggleAudioBtn.textContent = tr.enabled ? '🔇 Заглушить' : '🔊 Включить';
   }
 });
 
 toggleVideoBtn.addEventListener('click', () => {
-  if (localStream) {
-    const tracks = localStream.getVideoTracks();
-    if (tracks.length) {
-      const en = !tracks[0].enabled;
-      tracks[0].enabled = en;
-      toggleVideoBtn.textContent = en ? '📷 Выключить' : '📷 Включить';
-      log('info', 'Видео ' + (en ? 'включено' : 'выключено'));
-    } else {
-      log('warn', 'Нет видео-треков');
-    }
+  if (localStream && localStream.getVideoTracks().length) {
+    const tr = localStream.getVideoTracks()[0];
+    tr.enabled = !tr.enabled;
+    toggleVideoBtn.textContent = tr.enabled ? '📷 Выключить' : '📷 Включить';
   }
 });
-
-hangupBtn.addEventListener('click', exitRoom);
 
 copyLinkBtn.addEventListener('click', () => {
-  const link = inviteLink.href;
-  if (link) {
-    navigator.clipboard.writeText(link).then(() => {
-      statusDisplay.textContent = '✅ Ссылка скопирована!';
-      log('info', 'Ссылка скопирована');
-    }).catch(() => {
-      const ta = document.createElement('textarea');
-      ta.value = link;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      statusDisplay.textContent = '✅ Ссылка скопирована!';
-      log('info', 'Ссылка скопирована (запасной способ)');
-    });
-  }
+  navigator.clipboard.writeText(inviteLink.href).then(() => {
+    statusDisplay.textContent = '✅ Ссылка скопирована!';
+  });
 });
-
-exitRoomBtn.addEventListener('click', exitRoom);
 
 sendChatBtn.addEventListener('click', () => {
   const text = chatInput.value.trim();
@@ -1068,8 +971,7 @@ fileInput.addEventListener('change', (e) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target.result;
-      let mediaType = 'image';
-      if (file.type.startsWith('video/')) mediaType = 'video';
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'image';
       sendMessage(base64, mediaType);
     };
     reader.readAsDataURL(file);
@@ -1077,10 +979,7 @@ fileInput.addEventListener('change', (e) => {
   fileInput.value = '';
 });
 
-emojiToggleBtn.addEventListener('click', () => {
-  emojiPicker.classList.toggle('active');
-});
-
+emojiToggleBtn.addEventListener('click', () => emojiPicker.classList.toggle('active'));
 emojiPicker.addEventListener('click', (e) => {
   if (e.target.tagName === 'SPAN') {
     chatInput.value += e.target.textContent;
@@ -1090,20 +989,19 @@ emojiPicker.addEventListener('click', (e) => {
 });
 
 // ======================================================================
-// 19. АВТОВХОД
+// 17. ИНИЦИАЛИЗАЦИЯ И АВТОВХОД
 // ======================================================================
 window.addEventListener('load', () => {
   setTimeout(() => {
     splash.classList.add('hidden');
     app.classList.add('visible');
-    log('info', 'Приложение загружено');
-  }, 3000);
+  }, 2500);
 
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
   if (room) {
-    log('info', 'Автовход в комнату: ' + room);
-    setTimeout(() => joinRoom(room), 800);
+    log('info', 'Автовход по ссылке в комнату: ' + room);
+    setTimeout(() => joinRoom(room), 1500);
   }
 });
 </script>
