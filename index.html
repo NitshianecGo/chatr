@@ -23,7 +23,10 @@
     .invite-btn { padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex-shrink: 0; }
 
     /* Панель Логов */
-    .logs-panel { display: none; height: 140px; background: #1e1e1e; color: #00ff66; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; border-bottom: 1px solid #333; flex-direction: column; gap: 4px; }
+    .logs-container { display: none; flex-direction: column; background: #1e1e1e; border-bottom: 1px solid #333; }
+    .logs-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #2d2d2d; color: #aaa; font-size: 11px; }
+    .copy-log-btn { background: #007bff; color: white; border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; }
+    .logs-panel { height: 130px; color: #00ff66; font-family: monospace; font-size: 11px; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
     .logs-panel .log-entry { word-break: break-all; }
     .logs-panel .log-entry.err { color: #ff5555; }
 
@@ -47,7 +50,7 @@
 <body>
 
 <div class="chat-card">
-  <!-- Шапка с кнопками Звонка и Логов -->
+  <!-- Шапка -->
   <div class="header">
     <h3>Чат</h3>
     <div class="header-btns">
@@ -62,13 +65,19 @@
     <button class="invite-btn" onclick="copyInviteLink()">📋 Ссылка</button>
   </div>
 
-  <!-- Окно логов -->
-  <div class="logs-panel" id="logs-panel"></div>
+  <!-- Контейнер логов с кнопкой копирования -->
+  <div class="logs-container" id="logs-container">
+    <div class="logs-header">
+      <span>Журнал событий</span>
+      <button class="copy-log-btn" onclick="copyAllLogs()">📋 Копировать все логи</button>
+    </div>
+    <div class="logs-panel" id="logs-panel"></div>
+  </div>
 
   <!-- Сообщения -->
   <div class="messages" id="messages"></div>
 
-  <!-- Панель Эмодзи -->
+  <!-- Эмодзи -->
   <div class="emoji-picker" id="emoji-picker">
     <span onclick="addEmoji('😀')">😀</span>
     <span onclick="addEmoji('😂')">😂</span>
@@ -88,24 +97,39 @@
 <audio id="remote-audio" autoplay></audio>
 
 <script>
+  let rawLogs = [];
+
   function log(msg, isErr = false) {
-    const logsPanel = document.getElementById('logs-panel');
     const time = new Date().toLocaleTimeString();
+    const formatted = `[${time}] ${msg}`;
+    rawLogs.push(formatted);
+
+    const logsPanel = document.getElementById('logs-panel');
     const entry = document.createElement('div');
     entry.className = `log-entry ${isErr ? 'err' : ''}`;
-    entry.innerText = `[${time}] ${msg}`;
+    entry.innerText = formatted;
     logsPanel.appendChild(entry);
     logsPanel.scrollTop = logsPanel.scrollHeight;
     console.log(`[LOG] ${msg}`);
   }
 
+  function copyAllLogs() {
+    if (rawLogs.length === 0) return alert("Логи пусты!");
+    navigator.clipboard.writeText(rawLogs.join('\n')).then(() => {
+      alert("Все логи скопированы в буфер обмена!");
+    });
+  }
+
   log("Инициализация PeerJS...");
 
+  // Добавлены дополнительные STUN и TURN серверы для обхода NAT/Файрволов
   const peer = new Peer({
     config: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
       ]
     }
   });
@@ -129,10 +153,13 @@
   });
 
   peer.on('error', (err) => {
-    log(`Ошибка PeerJS: ${err.type} - ${err.message}`, true);
+    log(`Ошибка PeerJS (${err.type}): ${err.message}`, true);
+    if (err.type === 'peer-unavailable') {
+      document.getElementById('status-text').innerText = 'Собеседник не найден!';
+      appendMessage('Не удалось найти собеседника. Попросите его отправить свежую ссылку.', 'system');
+    }
   });
 
-  // Прием входящего подключения
   peer.on('connection', (c) => {
     log(`Получено входящее подключение от: ${c.peer}`);
     conn = c;
@@ -140,14 +167,12 @@
     bindConnectionEvents();
   });
 
-  // Инициация подключения
   function connectToPeer(remoteId) {
     log(`Отправка запроса на подключение к: ${remoteId}`);
     conn = peer.connect(remoteId, { reliable: true });
     bindConnectionEvents();
   }
 
-  // Привязка событий канала передачи данных
   function bindConnectionEvents() {
     if (!conn) return;
 
@@ -175,7 +200,6 @@
     });
   }
 
-  // Обработка звонков
   peer.on('call', async (call) => {
     log(`Входящий звонок от: ${call.peer}`);
     if (confirm("Входящий голосовой вызов! Ответить?")) {
@@ -242,7 +266,7 @@
     try {
       log("Инициализация исходящего вызова, запрос микрофона...");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      log(`Занок на ID: ${targetPeerId}`);
+      log(`Звонок на ID: ${targetPeerId}`);
       const call = peer.call(targetPeerId, stream);
       call.on('stream', (remoteStream) => {
         log("Аудиопоток собеседника получен.");
@@ -255,8 +279,8 @@
   }
 
   function toggleLogs() {
-    const panel = document.getElementById('logs-panel');
-    panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+    const container = document.getElementById('logs-container');
+    container.style.display = container.style.display === 'flex' ? 'none' : 'flex';
   }
 
   function toggleEmoji() {
