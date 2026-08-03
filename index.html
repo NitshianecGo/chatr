@@ -4,16 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Secure Chat</title>
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <!-- PeerJS -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <!-- tweetnacl -->
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
   <style>
-    /* (стили те же, что и в прошлой версии) */
+    /* (стили те же, что и в предыдущем ответе, я их не меняю) */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -98,10 +95,7 @@
       transition: opacity 1s ease;
     }
     #app.visible { opacity: 1; }
-    .header {
-      text-align: center;
-      margin-bottom: 15px;
-    }
+    .header { text-align: center; margin-bottom: 15px; }
     .header h1 { font-size: 2.2rem; font-weight: 700; color: #3b82f6; text-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
     .header .subtitle { color: #94a3b8; font-size: 1rem; border-top: 1px solid #2a3a5a; border-bottom: 1px solid #2a3a5a; padding: 6px 0; }
     .btn {
@@ -162,7 +156,7 @@
     }
     .invite-area.active { display: block; }
     .invite-area .link-label { font-weight: bold; color: #3b82f6; }
-    .invite-area .link-url { display: none; } /* скрываем ссылку */
+    .invite-area .link-url { display: none; }
     .status {
       text-align: center; font-size: 1rem; padding: 10px; border-radius: 60px;
       background: rgba(0,0,0,0.3); margin: 10px 0; color: #e0e0e0;
@@ -215,7 +209,6 @@
     <div class="subtitle">Шифрование • Звонки • Файлы</div>
   </div>
 
-  <!-- Главное меню -->
   <div id="initBlock" class="block-init">
     <div class="flex-row">
       <button class="btn btn-success" id="createRoomBtn">➕ Создать комнату</button>
@@ -234,7 +227,6 @@
     <div id="statusInit" class="status" style="margin-top:20px; background:transparent;">Готов к связи</div>
   </div>
 
-  <!-- Блок звонка и чата -->
   <div id="callBlock" class="block-call">
     <div class="video-grid" id="videoGrid">
       <div class="video-box" id="localVideoBox">
@@ -309,7 +301,7 @@ const PEER_OPTIONS = {
 };
 
 // ======================================================================
-// 2. FIREBASE (хранение сообщений)
+// 2. FIREBASE (хранение сообщений) — временно отключено для диагностики
 // ======================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDYRkGlyl5ySs4AyCuJEM39M-4FPok9sKA",
@@ -323,7 +315,7 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ======================================================================
-// 3. ШИФРОВАНИЕ
+// 3. ШИФРОВАНИЕ (tweetnacl)
 // ======================================================================
 function generateKeyPair() {
   const pair = nacl.box.keyPair();
@@ -360,7 +352,6 @@ let call = null;
 let localStream = null;
 let remoteStream = null;
 let isInitiator = false;
-let lifetimeTimer = null;
 let messages = [];
 let hasVideo = false, hasAudio = false;
 let myKeyPair = null;
@@ -395,7 +386,7 @@ const emojiToggleBtn = document.getElementById('emojiToggleBtn');
 const emojiPicker = document.getElementById('emojiPicker');
 
 // ======================================================================
-// 5. ВСПОМОГАТЕЛЬНЫЕ
+// 5. ВСПОМОГАТЕЛЬНЫЕ (addMessage с отключённым Firestore)
 // ======================================================================
 function addMessage(sender, content, mediaType = 'text', timestamp = Date.now()) {
   const div = document.createElement('div');
@@ -407,12 +398,15 @@ function addMessage(sender, content, mediaType = 'text', timestamp = Date.now())
   div.innerHTML = `<span class="sender">${sender}</span> <span class="time">${timeStr}</span><br>${displayContent}`;
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+  // Временно отключаем сохранение в Firestore для диагностики
+  /*
   if (currentRoom) {
     db.collection('rooms').doc(currentRoom).collection('messages').add({
       sender, content, mediaType,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(err => console.warn('Firestore save error:', err));
   }
+  */
 }
 
 function loadHistoryFromFirestore() {
@@ -446,32 +440,39 @@ async function testDevices() {
 // ======================================================================
 // 7. ЗАПУСК МЕДИА (отказоустойчиво)
 // ======================================================================
-async function getMedia() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    hasVideo = true; hasAudio = true;
-    console.log('Получен поток с видео и аудио');
-    return stream;
-  } catch (e1) {
-    console.warn('Видео+аудио не доступны, пробуем только аудио:', e1.message);
+async function getMedia(retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      hasVideo = false; hasAudio = true;
-      console.log('Получен поток только с аудио');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      hasVideo = true; hasAudio = true;
+      console.log('Получен поток с видео и аудио (попытка', attempt+1, ')');
       return stream;
-    } catch (e2) {
-      console.warn('Аудио не доступно, пробуем только видео:', e2.message);
+    } catch (e1) {
+      console.warn('Попытка', attempt+1, 'видео+аудио не доступны:', e1.message);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
-        hasVideo = true; hasAudio = false;
-        console.log('Получен поток только с видео');
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        hasVideo = false; hasAudio = true;
+        console.log('Получен поток только с аудио');
         return stream;
-      } catch (e3) {
-        console.warn('Ничего не доступно, создаём пустой поток:', e3.message);
-        return new MediaStream();
+      } catch (e2) {
+        console.warn('Попытка', attempt+1, 'аудио не доступно:', e2.message);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+          hasVideo = true; hasAudio = false;
+          console.log('Получен поток только с видео');
+          return stream;
+        } catch (e3) {
+          console.warn('Попытка', attempt+1, 'ничего не доступно:', e3.message);
+          if (attempt === retries) {
+            console.warn('Все попытки исчерпаны, создаём пустой поток');
+            return new MediaStream();
+          }
+          await new Promise(r => setTimeout(r, 1000));
+        }
       }
     }
   }
+  return new MediaStream();
 }
 
 // ======================================================================
@@ -510,7 +511,7 @@ async function createRoom() {
 
     myKeyPair = generateKeyPair();
 
-    const stream = await getMedia();
+    const stream = await getMedia(2);
     localStream = stream;
     if (hasVideo) localVideo.srcObject = stream;
     console.log('Локальный поток создан, треков:', localStream.getTracks().length);
@@ -522,7 +523,6 @@ async function createRoom() {
     });
     console.log('Peer создан с ID:', roomId);
 
-    // Обработка входящих DataConnection
     peer.on('connection', (dataConn) => {
       if (conn) { dataConn.close(); return; }
       conn = dataConn;
@@ -532,28 +532,36 @@ async function createRoom() {
         loadHistoryFromFirestore();
       });
       conn.on('data', (data) => handleIncomingData(data));
-      conn.on('close', () => { conn = null; statusDisplay.textContent = '⚠️ Соединение чата разорвано.'; });
+      conn.on('close', () => {
+        console.warn('DataConnection закрыто (создатель)');
+        conn = null;
+        statusDisplay.textContent = '⚠️ Соединение чата разорвано.';
+      });
+      conn.on('error', (err) => {
+        console.error('DataConnection error:', err);
+        statusDisplay.textContent = '❌ Ошибка соединения: ' + err.message;
+      });
     });
 
-    // Обработка входящих звонков
     peer.on('call', (incomingCall) => {
       console.log('Входящий звонок от:', incomingCall.peer);
       if (call) {
         console.warn('Звонок уже активен, отклоняем новый');
-        incomingCall.answer(); return;
+        incomingCall.answer(); 
+        return;
       }
-      if (!localStream) {
+      if (!localStream || localStream.getTracks().length === 0) {
         console.error('Нет локального потока для ответа');
-        incomingCall.answer(); return;
+        incomingCall.answer(); 
+        return;
       }
       call = incomingCall;
       call.answer(localStream);
       call.on('stream', (remote) => {
-        console.log('Получен удалённый поток');
+        console.log('Получен удалённый поток, треков:', remote.getTracks().length);
         remoteStream = remote;
         remoteVideo.srcObject = remote;
         statusDisplay.textContent = '📞 Товарищ на связи!';
-        console.log('Удалённый поток треков:', remote.getTracks().length);
         if (remote.getAudioTracks().length === 0) statusDisplay.textContent += ' (без аудио)';
         if (remote.getVideoTracks().length === 0) statusDisplay.textContent += ' (без видео)';
       });
@@ -566,10 +574,10 @@ async function createRoom() {
       call.on('error', (err) => {
         console.error('Ошибка звонка:', err);
         statusDisplay.textContent = '❌ Ошибка звонка: ' + err.message;
+        call = null;
       });
     });
 
-    // Ссылка без токена
     const link = window.location.origin + window.location.pathname + '?room=' + encodeURIComponent(roomId);
     inviteLink.href = link;
     inviteLink.textContent = link;
@@ -598,7 +606,7 @@ async function joinRoom(roomId) {
 
     myKeyPair = generateKeyPair();
 
-    const stream = await getMedia();
+    const stream = await getMedia(2);
     localStream = stream;
     if (hasVideo) localVideo.srcObject = stream;
     console.log('Локальный поток создан, треков:', localStream.getTracks().length);
@@ -610,7 +618,6 @@ async function joinRoom(roomId) {
     });
     console.log('Peer создан со случайным ID');
 
-    // DataConnection к комнате
     conn = peer.connect(roomId);
     conn.on('open', () => {
       statusDisplay.textContent = '✅ Соединение с комнатой установлено.';
@@ -618,22 +625,33 @@ async function joinRoom(roomId) {
       loadHistoryFromFirestore();
     });
     conn.on('data', (data) => handleIncomingData(data));
-    conn.on('close', () => { conn = null; statusDisplay.textContent = '⚠️ Соединение чата разорвано.'; });
+    conn.on('close', () => {
+      console.warn('DataConnection закрыто (входящий)');
+      conn = null;
+      statusDisplay.textContent = '⚠️ Соединение чата разорвано.';
+    });
+    conn.on('error', (err) => {
+      console.error('DataConnection error:', err);
+      statusDisplay.textContent = '❌ Ошибка соединения: ' + err.message;
+    });
 
-    // Инициируем звонок
-    if (!localStream) {
+    // Ждём небольшое время, чтобы соединение стабилизировалось
+    await new Promise(r => setTimeout(r, 500));
+
+    if (!localStream || localStream.getTracks().length === 0) {
       console.error('Нет локального потока для звонка');
       statusDisplay.textContent = '❌ Нет медиа-потока';
       return;
     }
+
+    console.log('Инициируем звонок к комнате:', roomId);
     const callObj = peer.call(roomId, localStream);
     call = callObj;
     call.on('stream', (remote) => {
-      console.log('Получен удалённый поток');
+      console.log('Получен удалённый поток, треков:', remote.getTracks().length);
       remoteStream = remote;
       remoteVideo.srcObject = remote;
       statusDisplay.textContent = '📞 Товарищ на связи!';
-      console.log('Удалённый поток треков:', remote.getTracks().length);
       if (remote.getAudioTracks().length === 0) statusDisplay.textContent += ' (без аудио)';
       if (remote.getVideoTracks().length === 0) statusDisplay.textContent += ' (без видео)';
     });
@@ -646,10 +664,11 @@ async function joinRoom(roomId) {
     call.on('error', (err) => {
       console.error('Ошибка звонка:', err);
       statusDisplay.textContent = '❌ Ошибка звонка: ' + err.message;
+      call = null;
     });
 
     showCallBlock();
-    document.getElementById('inviteArea').classList.remove('active'); // скрываем приглашение для входящего
+    document.getElementById('inviteArea').classList.remove('active');
     statusDisplay.textContent = '⏳ Устанавливаем соединение...';
     statusInit.textContent = 'Готов к связи';
 
@@ -660,11 +679,24 @@ async function joinRoom(roomId) {
 }
 
 // ======================================================================
-// 11. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ
+// 11. ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ (с улучшенным логированием)
 // ======================================================================
 function handleIncomingData(data) {
   try {
-    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    console.log('Получены данные:', data);
+    let parsed;
+    if (typeof data === 'string') {
+      try {
+        parsed = JSON.parse(data);
+      } catch (e) {
+        console.warn('Получены невалидные JSON-данные, считаем как текст:', data);
+        addMessage('Товарищ', data, 'text');
+        return;
+      }
+    } else {
+      parsed = data;
+    }
+    
     if (parsed.type === 'key') {
       peerPublicKey = parsed.publicKey;
       console.log('Получен публичный ключ собеседника');
@@ -679,28 +711,49 @@ function handleIncomingData(data) {
       addMessage(parsed.sender || 'Товарищ', decryptedContent, parsed.mediaType || 'text', parsed.timestamp);
       return;
     }
+    console.warn('Неизвестный тип данных:', parsed);
   } catch (e) {
-    console.warn('Ошибка обработки данных:', e);
+    console.error('Ошибка обработки входящих данных:', e);
+    statusDisplay.textContent = '⚠️ Ошибка обработки данных: ' + e.message;
   }
 }
 
 // ======================================================================
-// 12. ОТПРАВКА СООБЩЕНИЯ (с шифрованием)
+// 12. ОТПРАВКА СООБЩЕНИЯ (с проверкой соединения)
 // ======================================================================
 function sendMessage(text, mediaType = 'text', fileData = null) {
-  if (!conn) {
-    statusDisplay.textContent = '⚠️ Нет соединения для чата.';
+  if (!conn || !conn.open) {
+    statusDisplay.textContent = '⚠️ Нет открытого соединения для чата.';
+    console.warn('Попытка отправить сообщение без открытого соединения');
     return;
   }
+  
   let content = fileData || text;
   let encrypted = null;
   if (peerPublicKey) {
     encrypted = encryptMessage(content, peerPublicKey, myKeyPair.secretKey);
     content = '';
   }
-  const msg = { type: 'message', sender: 'Я', content, mediaType, timestamp: Date.now(), encrypted };
-  conn.send(JSON.stringify(msg));
-  addMessage('Я', fileData || text, mediaType, msg.timestamp);
+  const msg = { 
+    type: 'message', 
+    sender: 'Я', 
+    content, 
+    mediaType, 
+    timestamp: Date.now(), 
+    encrypted 
+  };
+  
+  try {
+    conn.send(JSON.stringify(msg));
+    console.log('Сообщение отправлено:', msg);
+    addMessage('Я', fileData || text, mediaType, msg.timestamp);
+  } catch (e) {
+    console.error('Ошибка при отправке сообщения:', e);
+    statusDisplay.textContent = '❌ Ошибка отправки: ' + e.message;
+    if (!conn.open) {
+      statusDisplay.textContent = '⚠️ Соединение разорвано, попробуйте перезайти.';
+    }
+  }
 }
 
 // ======================================================================
@@ -717,7 +770,6 @@ function exitRoom() {
   remoteVideo.srcObject = null;
   localVideo.srcObject = null;
   hideCallBlock();
-  if (lifetimeTimer) clearTimeout(lifetimeTimer);
   chatMessages.innerHTML = '';
   messages = [];
   currentRoom = null;
