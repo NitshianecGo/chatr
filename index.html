@@ -6,7 +6,7 @@
     <title>Домашний Чат</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
-        /* (стили без изменений – такие же, как в предыдущей версии) */
+        /* все стили без изменений – как в предыдущей версии */
         * { margin:0; padding:0; box-sizing:border-box; }
         :root {
             --bg: #2c1810;
@@ -232,9 +232,8 @@
 
     <script type="module">
         // ------------------------------------------------------------
-        // 0. ВСЕ ФУНКЦИИ ОБЪЯВЛЯЕМ ДО ВЫЗОВА (hoisting для function declarations)
+        // 1. Звуки
         // ------------------------------------------------------------
-        // Звуки (без изменений)
         function playBeep(freq=800, dur=200) {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -254,32 +253,42 @@
         function playCallRing() { playBeep(500, 300); setTimeout(()=>playBeep(700, 300), 400); }
         function playCallConnected() { playBeep(1200, 100); setTimeout(()=>playBeep(1500, 100), 200); }
 
-        // Supabase (или заглушка)
+        // ------------------------------------------------------------
+        // 2. Supabase
+        // ------------------------------------------------------------
         const SUPABASE_URL = 'https://uqtiieyrjzcqulpojlfd.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S';
+
         let supabase = null;
         try {
             const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
             supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-        } catch (e) { console.warn('Supabase не загружен, работаем в локальном режиме', e); }
+        } catch (e) {
+            console.warn('Supabase не загружен, работаем локально', e);
+        }
 
-        // Имена
+        // ------------------------------------------------------------
+        // 3. Имена
+        // ------------------------------------------------------------
         const ADJECTIVES = ['Весёлый', 'Грустный', 'Сонный', 'Голодный', 'Смешной', 'Умный', 'Быстрый', 'Храбрый', 'Ленивый', 'Добрый'];
         const ANIMALS = ['Лис', 'Волк', 'Медведь', 'Заяц', 'Ёж', 'Сова', 'Орёл', 'Кот', 'Пёс', 'Тигр', 'Лев', 'Слон', 'Олень', 'Барсук', 'Бобр'];
         function generateAnimalName() {
             return ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)] + ' ' + ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
         }
 
-        // localStorage helpers
+        // ------------------------------------------------------------
+        // 4. localStorage (защищённый)
+        // ------------------------------------------------------------
         function saveLocalData(key, data) {
-            try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+            try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
         }
         function loadLocalData(key, fallback) {
-            try { const raw = localStorage.getItem(key); if (raw) return JSON.parse(raw); return fallback; } catch(e) { return fallback; }
+            try { const raw = localStorage.getItem(key); if (raw) return JSON.parse(raw); } catch (e) {}
+            return fallback;
         }
 
         // ------------------------------------------------------------
-        // 1. Состояние
+        // 5. Пользователи, состояние, heartbeat
         // ------------------------------------------------------------
         const USER_IDS = ['user1', 'user2', 'user3', 'user4', 'user5'];
         let activeUsers = {};
@@ -293,11 +302,52 @@
         let isRecording = false;
         let recordingTimer = null;
         let recordingStart = 0;
+        let heartbeatInterval = null;
 
         const app = document.getElementById('app');
 
         // ------------------------------------------------------------
-        // 2. Класс CallManager (определён до использования)
+        // 6. Функции рендеринга (определены до вызова)
+        // ------------------------------------------------------------
+        function renderMessages() {
+            const container = document.getElementById('messages-container');
+            if (!container) return;
+            if (messages.length === 0) {
+                container.innerHTML = '<p style="color:var(--border);">Напишите первое сообщение</p>';
+                return;
+            }
+            container.innerHTML = messages.map(msg => {
+                const isMine = msg.sender === currentUser.id;
+                const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+                let content = msg.content;
+                if (msg.type === 'image') {
+                    content = `<img src="${msg.content}" alt="Фото" loading="lazy">`;
+                } else if (msg.type === 'video') {
+                    content = `<video src="${msg.content}" controls style="max-width:200px; max-height:200px;"></video>`;
+                } else if (msg.type === 'audio') {
+                    content = `<audio controls src="${msg.content}" style="width:150px; height:32px;"></audio>`;
+                } else {
+                    content = msg.content;
+                }
+                const senderName = Object.values(activeUsers).find(u => u.id === msg.sender)?.display_name || msg.sender;
+                return `
+                    <div class="msg ${isMine ? 'mine' : 'other'}">
+                        ${!isMine ? `<span class="name">${senderName}</span>` : ''}
+                        ${content}
+                        <span class="time">${time}</span>
+                    </div>
+                `;
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function getAvatar(id) {
+            const map = { 'user1':'👤', 'user2':'🧑', 'user3':'👨', 'user4':'👩', 'user5':'🧔' };
+            return map[id] || '👤';
+        }
+
+        // ------------------------------------------------------------
+        // 7. Класс CallManager (определён до использования)
         // ------------------------------------------------------------
         class CallManager {
             constructor(room, myId) {
@@ -496,15 +546,13 @@
             async sendSignal(targetId, type, data) {
                 try {
                     if (supabase) {
-                        try {
-                            await supabase.from('calls').insert([{
-                                room_id: this.room.id,
-                                sender: this.myId,
-                                type: type,
-                                data: data,
-                                created_at: new Date().toISOString()
-                            }]);
-                        } catch (e) {}
+                        await supabase.from('calls').insert([{
+                            room_id: this.room.id,
+                            sender: this.myId,
+                            type: type,
+                            data: data,
+                            created_at: new Date().toISOString()
+                        }]);
                     }
                 } catch (e) {}
             }
@@ -573,7 +621,7 @@
         }
 
         // ------------------------------------------------------------
-        // 3. Функции рендеринга (определены до использования)
+        // 8. Остальные функции (рендер экранов, комнаты, сообщения)
         // ------------------------------------------------------------
         function renderUserSelect() {
             const users = Object.values(activeUsers);
@@ -599,41 +647,112 @@
             });
         }
 
-        function getAvatar(id) {
-            const map = { 'user1':'👤', 'user2':'🧑', 'user3':'👨', 'user4':'👩', 'user5':'🧔' };
-            return map[id] || '👤';
+        async function loginUser(id) {
+            try {
+                const newName = generateAnimalName();
+                if (supabase) {
+                    try {
+                        await supabase.from('users').update({ 
+                            display_name: newName, 
+                            is_active: true,
+                            last_seen: new Date().toISOString()
+                        }).eq('id', id);
+                    } catch (e) {}
+                }
+                activeUsers[id].display_name = newName;
+                activeUsers[id].is_active = true;
+                activeUsers[id].last_seen = Date.now();
+                saveLocalData('chat_users', activeUsers);
+                currentUser = { id, display_name: newName };
+                // Запускаем heartbeat
+                startHeartbeat();
+                await loadRooms();
+            } catch (e) {
+                alert('Ошибка входа: ' + e.message);
+                console.error(e);
+            }
         }
 
-        function renderMessages() {
-            const container = document.getElementById('messages-container');
-            if (!container) return;
-            if (messages.length === 0) {
-                container.innerHTML = '<p style="color:var(--border);">Напишите первое сообщение</p>';
-                return;
-            }
-            container.innerHTML = messages.map(msg => {
-                const isMine = msg.sender === currentUser.id;
-                const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-                let content = msg.content;
-                if (msg.type === 'image') {
-                    content = `<img src="${msg.content}" alt="Фото" loading="lazy">`;
-                } else if (msg.type === 'video') {
-                    content = `<video src="${msg.content}" controls style="max-width:200px; max-height:200px;"></video>`;
-                } else if (msg.type === 'audio') {
-                    content = `<audio controls src="${msg.content}" style="width:150px; height:32px;"></audio>`;
-                } else {
-                    content = msg.content;
+        async function logoutUser() {
+            stopHeartbeat();
+            try {
+                if (supabase) {
+                    await supabase.from('users').update({ is_active: false }).eq('id', currentUser.id);
                 }
-                const senderName = Object.values(activeUsers).find(u => u.id === msg.sender)?.display_name || msg.sender;
-                return `
-                    <div class="msg ${isMine ? 'mine' : 'other'}">
-                        ${!isMine ? `<span class="name">${senderName}</span>` : ''}
-                        ${content}
-                        <span class="time">${time}</span>
-                    </div>
-                `;
-            }).join('');
-            container.scrollTop = container.scrollHeight;
+                activeUsers[currentUser.id].is_active = false;
+                saveLocalData('chat_users', activeUsers);
+            } catch (e) {}
+            currentUser = null;
+            renderUserSelect();
+        }
+
+        // Heartbeat – обновляем last_seen каждые 10 секунд
+        function startHeartbeat() {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            heartbeatInterval = setInterval(async () => {
+                if (!currentUser) return;
+                const now = new Date().toISOString();
+                try {
+                    if (supabase) {
+                        await supabase.from('users').update({ last_seen: now }).eq('id', currentUser.id);
+                    }
+                    activeUsers[currentUser.id].last_seen = Date.now();
+                    // Обновляем статусы других пользователей (проверяем, кто давно не обновлялся)
+                    await refreshUsersStatus();
+                } catch (e) {}
+            }, 10000);
+        }
+
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+        }
+
+        async function refreshUsersStatus() {
+            // Считаем неактивными тех, у кого last_seen старше 30 секунд
+            const now = Date.now();
+            const timeout = 30000; // 30 сек
+            for (const id in activeUsers) {
+                const user = activeUsers[id];
+                if (user.last_seen && (now - user.last_seen) > timeout) {
+                    if (user.is_active) {
+                        user.is_active = false;
+                        if (supabase) {
+                            try {
+                                await supabase.from('users').update({ is_active: false }).eq('id', id);
+                            } catch (e) {}
+                        }
+                    }
+                }
+            }
+            saveLocalData('chat_users', activeUsers);
+            // Перерисовываем экран выбора, если мы на нём
+            const userSelect = document.getElementById('user-select');
+            if (userSelect) renderUserSelect();
+        }
+
+        // ------------------------------------------------------------
+        // 9. Комнаты
+        // ------------------------------------------------------------
+        async function loadRooms() {
+            try {
+                let data = [];
+                if (supabase) {
+                    try {
+                        const { data: d, error } = await supabase
+                            .from('rooms')
+                            .select('*')
+                            .contains('participants', [currentUser.id]);
+                        if (!error) data = d || [];
+                    } catch (e) {}
+                }
+                renderRoomList(data);
+            } catch (e) {
+                alert('Ошибка загрузки комнат: ' + e.message);
+                console.error(e);
+            }
         }
 
         function renderRoomList(rooms) {
@@ -679,6 +798,134 @@
             });
         }
 
+        // ------------------------------------------------------------
+        // 10. Создание комнаты
+        // ------------------------------------------------------------
+        async function showCreateRoomDialog() {
+            const available = Object.values(activeUsers).filter(u => u.id !== currentUser.id);
+            if (available.length === 0) {
+                alert('Нет других пользователей для добавления.');
+                return;
+            }
+            const overlay = document.createElement('div');
+            overlay.id = 'call-overlay';
+            overlay.innerHTML = `
+                <div class="call-card" style="max-width:400px;">
+                    <h3 style="margin-bottom:12px;">Создать комнату</h3>
+                    <p style="font-size:14px; color:var(--border);">Выберите участников (можно нескольких):</p>
+                    <div class="participant-selector" id="participant-selector">
+                        ${available.map(u => `
+                            <button class="sel-btn" data-id="${u.id}">${u.display_name}</button>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+                        <button id="create-room-confirm" style="background:var(--accent); color:#2c1810;">Создать</button>
+                        <button id="create-room-cancel">Отмена</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const selected = new Set();
+            const selector = overlay.querySelector('#participant-selector');
+            selector.querySelectorAll('.sel-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const id = btn.dataset.id;
+                    if (selected.has(id)) {
+                        selected.delete(id);
+                        btn.classList.remove('selected');
+                    } else {
+                        selected.add(id);
+                        btn.classList.add('selected');
+                    }
+                };
+            });
+
+            document.getElementById('create-room-confirm').onclick = async () => {
+                if (selected.size === 0) {
+                    alert('Выберите хотя бы одного участника');
+                    return;
+                }
+                const participants = [currentUser.id, ...selected];
+                overlay.remove();
+                try {
+                    let room;
+                    if (supabase) {
+                        try {
+                            const { data, error } = await supabase
+                                .from('rooms')
+                                .insert([{
+                                    name: `Комната ${participants.join(', ')}`,
+                                    admin_id: currentUser.id,
+                                    participants: participants,
+                                    created_at: new Date().toISOString()
+                                }])
+                                .select()
+                                .single();
+                            if (error) throw error;
+                            room = data;
+                        } catch (e) {
+                            console.warn('Ошибка создания комнаты в Supabase, создаём локально', e);
+                            room = { id: 'local-' + Date.now(), name: 'Комната', admin_id: currentUser.id, participants };
+                        }
+                    } else {
+                        room = { id: 'local-' + Date.now(), name: 'Комната', admin_id: currentUser.id, participants };
+                    }
+                    enterRoom(room);
+                } catch (e) {
+                    alert('Ошибка создания комнаты: ' + e.message);
+                    console.error(e);
+                }
+            };
+            document.getElementById('create-room-cancel').onclick = () => overlay.remove();
+        }
+
+        // ------------------------------------------------------------
+        // 11. Вход в комнату
+        // ------------------------------------------------------------
+        async function enterRoom(room) {
+            currentRoom = room;
+            try {
+                let data = [];
+                if (supabase) {
+                    try {
+                        const { data: d, error } = await supabase
+                            .from('messages')
+                            .select('*')
+                            .eq('room_id', room.id)
+                            .order('created_at', { ascending: true });
+                        if (!error) data = d || [];
+                    } catch (e) {}
+                }
+                messages = data;
+                renderChatWindow(room);
+                if (supabase) {
+                    if (messagesSubscription) supabase.removeChannel(messagesSubscription);
+                    messagesSubscription = supabase
+                        .channel(`room-${room.id}`)
+                        .on('postgres_changes', {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'messages',
+                            filter: `room_id=eq.${room.id}`
+                        }, (payload) => {
+                            messages.push(payload.new);
+                            renderMessages();
+                            playNotification();
+                        })
+                        .subscribe();
+                }
+                if (callManager) callManager.cleanup();
+                callManager = new CallManager(room, currentUser.id);
+            } catch (e) {
+                alert('Ошибка загрузки сообщений: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // 12. Окно чата
+        // ------------------------------------------------------------
         function renderChatWindow(room) {
             const participantsList = room.participants.map(id => {
                 const user = Object.values(activeUsers).find(u => u.id === id);
@@ -710,7 +957,6 @@
                     </div>` : ''}
                 </div>
             `;
-            // Обработчики
             document.getElementById('back-btn').onclick = () => {
                 if (messagesSubscription && supabase) supabase.removeChannel(messagesSubscription);
                 if (callManager) callManager.cleanup();
@@ -726,13 +972,7 @@
             document.getElementById('attach-btn').onclick = () => document.getElementById('file-input').click();
             document.getElementById('file-input').onchange = handleFileUpload;
             document.getElementById('audio-btn').onclick = toggleRecording;
-            document.getElementById('call-btn').onclick = () => {
-                if (callManager) {
-                    callManager.startCall();
-                } else {
-                    alert('Звонок ещё не инициализирован');
-                }
-            };
+            document.getElementById('call-btn').onclick = () => { if (callManager) callManager.startCall(); };
             document.getElementById('invite-btn').onclick = inviteUserToRoom;
             if (isAdmin) {
                 document.getElementById('manage-users-btn').onclick = manageUsers;
@@ -743,7 +983,292 @@
         }
 
         // ------------------------------------------------------------
-        // 4. Логика входа/выхода, комнат, сообщений
+        // 13. Приглашение в комнату
+        // ------------------------------------------------------------
+        async function inviteUserToRoom() {
+            const currentParticipants = currentRoom.participants;
+            const available = Object.values(activeUsers).filter(u => !currentParticipants.includes(u.id) && u.id !== currentUser.id);
+            if (available.length === 0) {
+                alert('Нет свободных пользователей для приглашения.');
+                return;
+            }
+            const overlay = document.createElement('div');
+            overlay.id = 'call-overlay';
+            overlay.innerHTML = `
+                <div class="call-card" style="max-width:400px;">
+                    <h3 style="margin-bottom:12px;">Пригласить участника</h3>
+                    <div class="participant-selector" id="invite-selector">
+                        ${available.map(u => `
+                            <button class="sel-btn" data-id="${u.id}">${u.display_name}</button>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+                        <button id="invite-confirm" style="background:var(--accent); color:#2c1810;">Пригласить</button>
+                        <button id="invite-cancel">Отмена</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            let selected = null;
+            overlay.querySelectorAll('.sel-btn').forEach(btn => {
+                btn.onclick = () => {
+                    overlay.querySelectorAll('.sel-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selected = btn.dataset.id;
+                };
+            });
+
+            document.getElementById('invite-confirm').onclick = async () => {
+                if (!selected) {
+                    alert('Выберите пользователя');
+                    return;
+                }
+                const newParticipants = [...currentRoom.participants, selected];
+                overlay.remove();
+                try {
+                    if (supabase) {
+                        try {
+                            await supabase.from('rooms').update({ participants: newParticipants }).eq('id', currentRoom.id);
+                        } catch (e) {}
+                    }
+                    currentRoom.participants = newParticipants;
+                    renderChatWindow(currentRoom);
+                    alert('Пользователь приглашён');
+                } catch (e) {
+                    alert('Ошибка приглашения: ' + e.message);
+                    console.error(e);
+                }
+            };
+            document.getElementById('invite-cancel').onclick = () => overlay.remove();
+        }
+
+        // ------------------------------------------------------------
+        // 14. Отправка сообщений
+        // ------------------------------------------------------------
+        async function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            const msg = {
+                room_id: currentRoom.id,
+                sender: currentUser.id,
+                content: text,
+                type: 'text',
+                created_at: new Date().toISOString()
+            };
+            try {
+                if (supabase) {
+                    try {
+                        await supabase.from('messages').insert([msg]);
+                    } catch (e) {
+                        console.warn('Ошибка отправки в Supabase, сохраняем локально', e);
+                        messages.push(msg);
+                        renderMessages();
+                    }
+                } else {
+                    messages.push(msg);
+                    renderMessages();
+                }
+            } catch (e) {
+                alert('Ошибка отправки: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        function compressFile(file) {
+            return new Promise((resolve) => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const MAX = 800;
+                            let width = img.width, height = img.height;
+                            if (width > height) {
+                                if (width > MAX) { height *= MAX / width; width = MAX; }
+                            } else {
+                                if (height > MAX) { width *= MAX / height; height = MAX; }
+                            }
+                            canvas.width = width; canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            const quality = 0.7;
+                            resolve(canvas.toDataURL(file.type, quality));
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                } else if (file.type.startsWith('video/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve(e.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    resolve(null);
+                }
+            });
+        }
+
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            e.target.value = '';
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Файл слишком большой, отправьте до 5 МБ');
+                return;
+            }
+            const compressed = await compressFile(file);
+            if (!compressed) return;
+            const msg = {
+                room_id: currentRoom.id,
+                sender: currentUser.id,
+                content: compressed,
+                type: file.type.startsWith('image/') ? 'image' : 'video',
+                created_at: new Date().toISOString()
+            };
+            try {
+                if (supabase) {
+                    try {
+                        await supabase.from('messages').insert([msg]);
+                    } catch (e) {
+                        console.warn('Ошибка отправки медиа в Supabase, сохраняем локально', e);
+                        messages.push(msg);
+                        renderMessages();
+                    }
+                } else {
+                    messages.push(msg);
+                    renderMessages();
+                }
+            } catch (e) {
+                alert('Ошибка отправки медиа: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // 15. Аудиозапись
+        // ------------------------------------------------------------
+        async function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = async function() {
+                        const base64 = reader.result;
+                        const msg = {
+                            room_id: currentRoom.id,
+                            sender: currentUser.id,
+                            content: base64,
+                            type: 'audio',
+                            created_at: new Date().toISOString()
+                        };
+                        try {
+                            if (supabase) {
+                                try {
+                                    await supabase.from('messages').insert([msg]);
+                                } catch (e) {
+                                    console.warn('Ошибка отправки аудио в Supabase, сохраняем локально', e);
+                                    messages.push(msg);
+                                    renderMessages();
+                                }
+                            } else {
+                                messages.push(msg);
+                                renderMessages();
+                            }
+                        } catch (e) {
+                            alert('Ошибка отправки аудио: ' + e.message);
+                            console.error(e);
+                        }
+                        stream.getTracks().forEach(t => t.stop());
+                    };
+                    reader.readAsDataURL(blob);
+                    isRecording = false;
+                    document.getElementById('recording-status').classList.add('hidden');
+                    document.getElementById('audio-btn').textContent = '🎤';
+                    clearInterval(recordingTimer);
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStart = Date.now();
+                document.getElementById('recording-status').classList.remove('hidden');
+                document.getElementById('audio-btn').textContent = '⏹️';
+                recordingTimer = setInterval(() => {
+                    const elapsed = (Date.now() - recordingStart) / 1000;
+                    if (elapsed >= 60) {
+                        stopRecording();
+                    }
+                }, 1000);
+            } catch (e) {
+                alert('Нет доступа к микрофону');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+            } else {
+                isRecording = false;
+                document.getElementById('recording-status').classList.add('hidden');
+                document.getElementById('audio-btn').textContent = '🎤';
+                clearInterval(recordingTimer);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // 16. Управление участниками (админ) – исключение
+        // ------------------------------------------------------------
+        async function manageUsers() {
+            const participants = currentRoom.participants;
+            const list = participants.map(id => {
+                const user = Object.values(activeUsers).find(u => u.id === id);
+                return user ? user.display_name : id;
+            }).join('\n');
+            const action = prompt(
+                `Участники:\n${list}\n\nВведите id пользователя, которого хотите исключить (или 'отмена'):`,
+                ''
+            );
+            if (!action || action === 'отмена') return;
+            const targetId = action.trim();
+            if (targetId === currentUser.id) {
+                alert('Вы не можете исключить себя');
+                return;
+            }
+            if (!participants.includes(targetId)) {
+                alert('Такого пользователя нет в комнате');
+                return;
+            }
+            const newParticipants = participants.filter(id => id !== targetId);
+            try {
+                if (supabase) {
+                    try {
+                        await supabase.from('rooms').update({ participants: newParticipants }).eq('id', currentRoom.id);
+                    } catch (e) {}
+                }
+                currentRoom.participants = newParticipants;
+                renderChatWindow(currentRoom);
+                alert('Пользователь исключён');
+            } catch (e) {
+                alert('Ошибка исключения: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // 17. Инициализация пользователей
         // ------------------------------------------------------------
         async function initUsers() {
             let localUsers = loadLocalData('chat_users', null);
@@ -751,7 +1276,7 @@
                 activeUsers = localUsers;
             } else {
                 for (const id of USER_IDS) {
-                    activeUsers[id] = { id, display_name: generateAnimalName(), is_active: false };
+                    activeUsers[id] = { id, display_name: generateAnimalName(), is_active: false, last_seen: 0 };
                 }
                 saveLocalData('chat_users', activeUsers);
             }
@@ -760,71 +1285,28 @@
                 try {
                     const { data, error } = await supabase.from('users').select('*');
                     if (!error && data.length > 0) {
-                        data.forEach(u => { activeUsers[u.id] = u; });
+                        // Обновляем локальные данные из БД
+                        data.forEach(u => {
+                            if (activeUsers[u.id]) {
+                                activeUsers[u.id].display_name = u.display_name;
+                                // Проверяем активность по last_seen
+                                const lastSeen = u.last_seen ? new Date(u.last_seen).getTime() : 0;
+                                const now = Date.now();
+                                activeUsers[u.id].is_active = (now - lastSeen) < 30000; // 30 сек
+                                activeUsers[u.id].last_seen = lastSeen;
+                            }
+                        });
                         saveLocalData('chat_users', activeUsers);
                     }
-                } catch (e) { console.warn('Не удалось синхронизировать с Supabase', e); }
+                } catch (e) {
+                    console.warn('Не удалось синхронизировать с Supabase', e);
+                }
             }
             renderUserSelect();
         }
-
-        async function loginUser(id) {
-            try {
-                const newName = generateAnimalName();
-                if (supabase) {
-                    try {
-                        await supabase.from('users').update({ display_name: newName, is_active: true }).eq('id', id);
-                    } catch (e) {}
-                }
-                activeUsers[id].display_name = newName;
-                activeUsers[id].is_active = true;
-                saveLocalData('chat_users', activeUsers);
-                currentUser = { id, display_name: newName };
-                await loadRooms();
-            } catch (e) {
-                alert('Ошибка входа: ' + e.message);
-                console.error(e);
-            }
-        }
-
-        async function logoutUser() {
-            try {
-                if (supabase) {
-                    try {
-                        await supabase.from('users').update({ is_active: false }).eq('id', currentUser.id);
-                    } catch (e) {}
-                }
-                activeUsers[currentUser.id].is_active = false;
-                saveLocalData('chat_users', activeUsers);
-            } catch (e) {}
-            currentUser = null;
-            renderUserSelect();
-        }
-
-        async function loadRooms() {
-            try {
-                let data = [];
-                if (supabase) {
-                    try {
-                        const { data: d, error } = await supabase
-                            .from('rooms')
-                            .select('*')
-                            .contains('participants', [currentUser.id]);
-                        if (!error) data = d || [];
-                    } catch (e) {}
-                }
-                renderRoomList(data);
-            } catch (e) {
-                alert('Ошибка загрузки комнат: ' + e.message);
-                console.error(e);
-            }
-        }
-
-        // Остальные функции (createRoom, enterRoom, invite, manageUsers, sendMessage, etc.) – объявляем далее
-        // ... (они уже были в предыдущем коде, я добавлю их, но не буду дублировать весь объём)
 
         // ------------------------------------------------------------
-        // 5. Запуск
+        // 18. Запуск
         // ------------------------------------------------------------
         try {
             await initUsers();
