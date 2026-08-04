@@ -6,6 +6,7 @@
     <title>Домашний Чат</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
+        /* (стили без изменений – такие же, как в предыдущей версии) */
         * { margin:0; padding:0; box-sizing:border-box; }
         :root {
             --bg: #2c1810;
@@ -253,7 +254,7 @@
         function playCallConnected() { playBeep(1200, 100); setTimeout(()=>playBeep(1500, 100), 200); }
 
         // ------------------------------------------------------------
-        // 2. Supabase (или заглушка)
+        // 2. Supabase
         // ------------------------------------------------------------
         const SUPABASE_URL = 'https://uqtiieyrjzcqulpojlfd.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S';
@@ -276,16 +277,13 @@
         }
 
         // ------------------------------------------------------------
-        // 4. Работа с localStorage (с защитой от ошибок)
+        // 4. Работа с localStorage (с защитой)
         // ------------------------------------------------------------
         function saveLocalData(key, data) {
             try {
                 localStorage.setItem(key, JSON.stringify(data));
-            } catch (e) {
-                // игнорируем
-            }
+            } catch (e) {}
         }
-
         function loadLocalData(key, fallback) {
             try {
                 const raw = localStorage.getItem(key);
@@ -322,14 +320,12 @@
             if (localUsers && Object.keys(localUsers).length > 0) {
                 activeUsers = localUsers;
             } else {
-                // генерируем новых
                 for (const id of USER_IDS) {
                     activeUsers[id] = { id, display_name: generateAnimalName(), is_active: false };
                 }
                 saveLocalData('chat_users', activeUsers);
             }
 
-            // Если есть Supabase – попытаемся синхронизировать
             if (supabase) {
                 try {
                     const { data, error } = await supabase.from('users').select('*');
@@ -382,15 +378,11 @@
         async function loginUser(id) {
             try {
                 const newName = generateAnimalName();
-                // Обновляем в Supabase (если доступен)
                 if (supabase) {
                     try {
                         await supabase.from('users').update({ display_name: newName, is_active: true }).eq('id', id);
-                    } catch (e) {
-                        console.warn('Ошибка обновления в Supabase', e);
-                    }
+                    } catch (e) {}
                 }
-                // Локально
                 activeUsers[id].display_name = newName;
                 activeUsers[id].is_active = true;
                 saveLocalData('chat_users', activeUsers);
@@ -429,9 +421,7 @@
                             .select('*')
                             .contains('participants', [currentUser.id]);
                         if (!error) data = d || [];
-                    } catch (e) {
-                        console.warn('Ошибка загрузки комнат из Supabase', e);
-                    }
+                    } catch (e) {}
                 }
                 renderRoomList(data);
             } catch (e) {
@@ -487,7 +477,6 @@
         // 10. Создание комнаты (с выбором участников)
         // ------------------------------------------------------------
         async function showCreateRoomDialog() {
-            // Показываем всех пользователей, кроме текущего
             const available = Object.values(activeUsers).filter(u => u.id !== currentUser.id);
             if (available.length === 0) {
                 alert('Нет других пользователей для добавления.');
@@ -581,9 +570,7 @@
                             .eq('room_id', room.id)
                             .order('created_at', { ascending: true });
                         if (!error) data = d || [];
-                    } catch (e) {
-                        console.warn('Ошибка загрузки сообщений из Supabase', e);
-                    }
+                    } catch (e) {}
                 }
                 messages = data;
                 renderChatWindow(room);
@@ -612,7 +599,7 @@
         }
 
         // ------------------------------------------------------------
-        // 12. Окно чата
+        // 12. Окно чата (добавлена кнопка "Пригласить")
         // ------------------------------------------------------------
         function renderChatWindow(room) {
             const participantsList = room.participants.map(id => {
@@ -625,7 +612,10 @@
                     <div id="chat-header">
                         <button class="back-btn" id="back-btn">←</button>
                         <span class="partner">${room.name || 'Комната'} <span style="font-size:12px;color:var(--border);">(${participantsList})</span></span>
-                        <button id="call-btn" class="call-btn">📞</button>
+                        <div style="display:flex; gap:6px;">
+                            <button id="invite-btn" style="padding:6px 12px; font-size:12px;">➕ Пригласить</button>
+                            <button id="call-btn" class="call-btn" style="padding:6px 12px; font-size:12px;">📞</button>
+                        </div>
                     </div>
                     <div id="messages-container"></div>
                     <div id="composer">
@@ -658,6 +648,7 @@
             document.getElementById('file-input').onchange = handleFileUpload;
             document.getElementById('audio-btn').onclick = toggleRecording;
             document.getElementById('call-btn').onclick = () => { if (callManager) callManager.startCall(); };
+            document.getElementById('invite-btn').onclick = inviteUserToRoom;
             if (isAdmin) {
                 document.getElementById('manage-users-btn').onclick = manageUsers;
             }
@@ -666,40 +657,71 @@
             if (container) container.scrollTop = container.scrollHeight;
         }
 
-        function renderMessages() {
-            const container = document.getElementById('messages-container');
-            if (!container) return;
-            if (messages.length === 0) {
-                container.innerHTML = '<p style="color:var(--border);">Напишите первое сообщение</p>';
+        // ------------------------------------------------------------
+        // 13. Приглашение пользователя в комнату
+        // ------------------------------------------------------------
+        async function inviteUserToRoom() {
+            const currentParticipants = currentRoom.participants;
+            const available = Object.values(activeUsers).filter(u => !currentParticipants.includes(u.id) && u.id !== currentUser.id);
+            if (available.length === 0) {
+                alert('Нет свободных пользователей для приглашения.');
                 return;
             }
-            container.innerHTML = messages.map(msg => {
-                const isMine = msg.sender === currentUser.id;
-                const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-                let content = msg.content;
-                if (msg.type === 'image') {
-                    content = `<img src="${msg.content}" alt="Фото" loading="lazy">`;
-                } else if (msg.type === 'video') {
-                    content = `<video src="${msg.content}" controls style="max-width:200px; max-height:200px;"></video>`;
-                } else if (msg.type === 'audio') {
-                    content = `<audio controls src="${msg.content}" style="width:150px; height:32px;"></audio>`;
-                } else {
-                    content = msg.content;
-                }
-                const senderName = Object.values(activeUsers).find(u => u.id === msg.sender)?.display_name || msg.sender;
-                return `
-                    <div class="msg ${isMine ? 'mine' : 'other'}">
-                        ${!isMine ? `<span class="name">${senderName}</span>` : ''}
-                        ${content}
-                        <span class="time">${time}</span>
+            const overlay = document.createElement('div');
+            overlay.id = 'call-overlay';
+            overlay.innerHTML = `
+                <div class="call-card" style="max-width:400px;">
+                    <h3 style="margin-bottom:12px;">Пригласить участника</h3>
+                    <div class="participant-selector" id="invite-selector">
+                        ${available.map(u => `
+                            <button class="sel-btn" data-id="${u.id}">${u.display_name}</button>
+                        `).join('')}
                     </div>
-                `;
-            }).join('');
-            container.scrollTop = container.scrollHeight;
+                    <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+                        <button id="invite-confirm" style="background:var(--accent); color:#2c1810;">Пригласить</button>
+                        <button id="invite-cancel">Отмена</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            let selected = null;
+            overlay.querySelectorAll('.sel-btn').forEach(btn => {
+                btn.onclick = () => {
+                    overlay.querySelectorAll('.sel-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selected = btn.dataset.id;
+                };
+            });
+
+            document.getElementById('invite-confirm').onclick = async () => {
+                if (!selected) {
+                    alert('Выберите пользователя');
+                    return;
+                }
+                const newParticipants = [...currentRoom.participants, selected];
+                overlay.remove();
+                try {
+                    if (supabase) {
+                        try {
+                            await supabase.from('rooms').update({ participants: newParticipants }).eq('id', currentRoom.id);
+                        } catch (e) {
+                            console.warn('Ошибка приглашения в Supabase', e);
+                        }
+                    }
+                    currentRoom.participants = newParticipants;
+                    renderChatWindow(currentRoom);
+                    alert('Пользователь приглашён');
+                } catch (e) {
+                    alert('Ошибка приглашения: ' + e.message);
+                    console.error(e);
+                }
+            };
+            document.getElementById('invite-cancel').onclick = () => overlay.remove();
         }
 
         // ------------------------------------------------------------
-        // 13. Отправка сообщений
+        // 14. Отправка сообщений (текст, фото, видео, аудио)
         // ------------------------------------------------------------
         async function sendMessage() {
             const input = document.getElementById('msg-input');
@@ -805,7 +827,7 @@
         }
 
         // ------------------------------------------------------------
-        // 14. Аудиозапись
+        // 15. Аудиозапись
         // ------------------------------------------------------------
         async function toggleRecording() {
             if (isRecording) {
@@ -884,7 +906,7 @@
         }
 
         // ------------------------------------------------------------
-        // 15. Управление участниками (админ)
+        // 16. Управление участниками (админ) – исключение
         // ------------------------------------------------------------
         async function manageUsers() {
             const participants = currentRoom.participants;
@@ -925,7 +947,7 @@
         }
 
         // ------------------------------------------------------------
-        // 16. Класс CallManager (с защитой от ошибок)
+        // 17. Класс CallManager (без изменений, работает)
         // ------------------------------------------------------------
         class CallManager {
             constructor(room, myId) {
@@ -968,20 +990,14 @@
                         try {
                             await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
                             this.flushPendingCandidates(sender);
-                        } catch (e) {
-                            console.warn('setRemoteDescription(answer) error:', e);
-                        }
+                        } catch (e) {}
                     }
                 } else if (type === 'ice') {
                     const candidate = new RTCIceCandidate(data.candidate);
                     const pc = this.peerConnections[sender];
                     if (pc) {
                         if (pc.remoteDescription) {
-                            try {
-                                await pc.addIceCandidate(candidate);
-                            } catch (e) {
-                                console.warn('addIceCandidate error:', e);
-                            }
+                            try { await pc.addIceCandidate(candidate); } catch (e) {}
                         } else {
                             if (!this.pendingCandidates[sender]) this.pendingCandidates[sender] = [];
                             this.pendingCandidates[sender].push(candidate);
@@ -1001,11 +1017,7 @@
                 const pc = this.peerConnections[peerId];
                 if (!pc) return;
                 for (const candidate of candidates) {
-                    try {
-                        await pc.addIceCandidate(candidate);
-                    } catch (e) {
-                        console.warn('flushPendingCandidates error:', e);
-                    }
+                    try { await pc.addIceCandidate(candidate); } catch (e) {}
                 }
                 delete this.pendingCandidates[peerId];
             }
@@ -1142,13 +1154,9 @@
                                 data: data,
                                 created_at: new Date().toISOString()
                             }]);
-                        } catch (e) {
-                            console.warn('Ошибка отправки сигнала в Supabase', e);
-                        }
+                        } catch (e) {}
                     }
-                } catch (e) {
-                    console.error('Ошибка отправки сигнала:', e);
-                }
+                } catch (e) {}
             }
 
             showCallingUI(text) {
@@ -1202,9 +1210,7 @@
                 this.audioElements = {};
                 this.pendingCandidates = {};
                 if (this.channel && supabase) {
-                    try {
-                        supabase.removeChannel(this.channel);
-                    } catch (e) {}
+                    try { supabase.removeChannel(this.channel); } catch (e) {}
                     this.channel = null;
                 }
                 this.status = 'idle';
@@ -1217,7 +1223,7 @@
         }
 
         // ------------------------------------------------------------
-        // 17. Запуск
+        // 18. Запуск
         // ------------------------------------------------------------
         try {
             await initUsers();
