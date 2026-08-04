@@ -1,1022 +1,491 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>СС·ЧАТ — Secure Soviet Hub</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#09090b;--surface:#18181b;--surface2:#27272a;--border:#3f3f46;
-  --text:#fafafa;--muted:#a1a1aa;--dim:#71717a;
-  --amber:#f59e0b;--amber-light:#fbbf24;--red:#dc2626;--red-light:#ef4444;
-  --emerald:#10b981;
-}
-html,body{height:100%;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-::-webkit-scrollbar-thumb:hover{background:var(--amber)}
-::selection{background:rgba(245,158,11,.3)}
-button{cursor:pointer;font-family:inherit;border:none;background:none;color:inherit}
-input,textarea{font-family:inherit;outline:none}
-.hidden{display:none!important}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P2P Чат и Звонки</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --chat-bg: #ffffff;
+      --msg-my: #4f46e5;
+      --msg-peer: #f3f4f6;
+    }
 
-/* ── Welcome ── */
-.welcome{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;position:relative;overflow:hidden}
-.welcome::before{content:'';position:absolute;inset:0;opacity:.04;background-image:linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
-.welcome-glow1{position:absolute;top:-160px;left:-160px;width:384px;height:384px;background:rgba(245,158,11,.1);border-radius:50%;filter:blur(80px)}
-.welcome-glow2{position:absolute;bottom:-160px;right:-160px;width:384px;height:384px;background:rgba(220,38,38,.1);border-radius:50%;filter:blur(80px)}
-.welcome-wrap{position:relative;width:100%;max-width:448px}
-.logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:32px}
-.logo-icon{position:relative;width:80px;height:80px;border-radius:16px;background:linear-gradient(135deg,#fbbf24,#ef4444,#b91c1c);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(245,158,11,.2);margin-bottom:16px}
-.logo-icon::before{content:'';position:absolute;inset:0;background:rgba(245,158,11,.3);filter:blur(20px);border-radius:50%;z-index:-1}
-.logo-icon svg{width:40px;height:40px;fill:#09090b}
-.logo-title{font-size:30px;font-weight:900;letter-spacing:-.02em;background:linear-gradient(90deg,#fde68a,#f87171);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.logo-sub{font-size:11px;color:#71717a;margin-top:4px;letter-spacing:.3em;text-transform:uppercase}
-.card{background:rgba(24,24,27,.7);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 16px 48px rgba(0,0,0,.4)}
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:rgba(9,9,11,.6);border-radius:12px;margin-bottom:24px}
-.tab{padding:10px;border-radius:8px;font-size:14px;font-weight:600;color:var(--muted);transition:all .2s}
-.tab.active{background:linear-gradient(90deg,#f59e0b,#dc2626);color:#09090b;box-shadow:0 4px 12px rgba(220,38,38,.2)}
-.field{margin-bottom:16px}
-.field label{display:block;font-size:11px;color:var(--dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
-.field input{width:100%;background:rgba(9,9,11,.6);border:1px solid var(--border);border-radius:12px;padding:12px 16px;color:var(--text);font-size:15px;transition:border-color .2s}
-.field input:focus{border-color:rgba(245,158,11,.5);box-shadow:0 0 0 1px rgba(245,158,11,.15)}
-.field input::placeholder{color:#52525b}
-.btn-primary{width:100%;padding:14px;border-radius:12px;background:linear-gradient(90deg,#f59e0b,#dc2626);color:#09090b;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s}
-.btn-primary:hover{box-shadow:0 8px 24px rgba(220,38,38,.3);transform:translateY(-1px)}
-.btn-primary:active{transform:translateY(0)}
-.error{font-size:14px;color:var(--red-light);margin-bottom:12px}
-.hint{margin-top:20px;padding-top:20px;border-top:1px solid rgba(63,63,70,.8);display:flex;gap:10px;font-size:12px;color:var(--dim)}
-.hint svg{width:16px;height:16px;fill:rgba(245,158,11,.7);flex-shrink:0;margin-top:2px}
-.features{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:24px}
-.feature{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--dim)}
-.feature svg{width:18px;height:18px;fill:rgba(245,158,11,.6)}
-.feature span{font-size:10px;text-transform:uppercase;letter-spacing:.05em}
-.auth-buttons{display:flex;gap:8px;margin-bottom:16px}
-.auth-btn{padding:8px 16px;border-radius:8px;font-weight:600;font-size:13px;background:var(--surface2);color:var(--text);transition:all .15s;flex:1}
-.auth-btn:hover{background:var(--border)}
-.auth-btn.primary{background:linear-gradient(90deg,#f59e0b,#dc2626);color:#09090b}
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
+    
+    body { 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 100vh; 
+      background: var(--bg-gradient);
+      padding: 10px;
+    }
 
-/* ── Chat ── */
-.chat{height:100vh;display:flex;flex-direction:column;background:var(--bg)}
-.header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(24,24,27,.8);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);flex-shrink:0}
-.header-avatar{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#fbbf24,#dc2626);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;color:#09090b;flex-shrink:0}
-.header-info{flex:1;min-width:0}
-.header-name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.header-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
-.status-dot{width:6px;height:6px;border-radius:50%}
-.status-dot.online{background:var(--emerald)}
-.status-dot.offline{background:#52525b}
-.header-btn{padding:8px;border-radius:8px;color:var(--muted);transition:all .15s;display:flex;align-items:center;justify-content:center}
-.header-btn:hover{color:var(--amber);background:var(--surface2)}
-.header-btn:disabled{opacity:.3;cursor:not-allowed}
-.header-btn svg{width:20px;height:20px;fill:currentColor}
-.header-divider{width:1px;height:24px;background:var(--border)}
-.chat-body{flex:1;display:flex;overflow:hidden}
-.messages-wrap{flex:1;display:flex;flex-direction:column;min-width:0}
-.messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
-.spinner-wrap{display:flex;align-items:center;justify-content:center;height:100%}
-.spinner{width:32px;height:32px;border:2px solid rgba(245,158,11,.3);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:32px}
-.empty-icon{width:64px;height:64px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
-.empty-icon svg{width:28px;height:28px;fill:#52525b}
-.empty-text{color:var(--muted);font-size:14px}
-.empty-code{color:#52525b;font-size:12px;margin-top:4px}
-.empty-code span{font-family:monospace;color:rgba(245,158,11,.7)}
-.load-more{text-align:center;padding:8px;color:var(--amber);cursor:pointer;font-size:13px;border-radius:8px;transition:background .15s}
-.load-more:hover{background:var(--surface2)}
+    .chat-card { 
+      width: 100%; 
+      max-width: 480px; 
+      height: 680px; 
+      background: var(--chat-bg); 
+      border-radius: 20px; 
+      display: flex; 
+      flex-direction: column; 
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04); 
+      overflow: hidden; 
+    }
+    
+    /* Шапка */
+    .header { 
+      padding: 16px 20px; 
+      background: #ffffff; 
+      color: #1f2937; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .header h3 { font-size: 18px; font-weight: 700; color: #111827; }
+    .header-btns { display: flex; gap: 8px; }
+    
+    .btn {
+      border: none;
+      padding: 8px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .call-btn { background: #10b981; color: white; }
+    .call-btn:hover { background: #059669; }
+    .log-btn { background: #f3f4f6; color: #4b5563; }
+    .log-btn:hover { background: #e5e7eb; }
 
-.msg{display:flex;position:relative}
-.msg.mine{justify-content:flex-end}
-.msg-content{display:flex;flex-direction:column;gap:2px;max-width:80%}
-.msg.mine .msg-content{align-items:flex-end}
-.msg-name{font-size:12px;color:rgba(245,158,11,.7);padding:0 4px}
-.msg-bubble{border-radius:16px;padding:8px 14px;word-break:break-word;white-space:pre-wrap;font-size:14px;line-height:1.5}
-.msg.mine .msg-bubble{background:linear-gradient(135deg,#f59e0b,#dc2626);color:#09090b;font-weight:500;border-bottom-right-radius:4px}
-.msg.other .msg-bubble{background:var(--surface2);color:var(--text);border-bottom-left-radius:4px}
-.msg-time{font-size:10px;color:#52525b;padding:0 4px}
-.msg-delete{position:absolute;top:-4px;right:-4px;background:var(--surface);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:all .15s;opacity:0}
-.msg.mine:hover .msg-delete{opacity:1}
-.msg-delete:hover{color:var(--red);border-color:var(--red)}
-.msg-delete svg{width:14px;height:14px;fill:currentColor}
+    /* Информационная панель */
+    .invite-bar { 
+      padding: 10px 16px; 
+      background: #f9fafb; 
+      font-size: 13px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      gap: 12px; 
+      border-bottom: 1px solid #f3f4f6; 
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      color: #6b7280;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+    }
+    .status-dot.online { background: #10b981; }
+    .status-dot.error { background: #ef4444; }
 
-.msg-image{border-radius:16px;overflow:hidden;border:1px solid var(--border)}
-.msg.mine .msg-image{border-color:rgba(245,158,11,.2)}
-.msg-image img{max-width:100%;max-height:288px;object-fit:cover;cursor:pointer;display:block}
-.msg-image .img-error{width:192px;height:128px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#52525b}
-.msg-image .img-error svg{width:24px;height:24px;fill:#52525b}
-.msg-audio{border-radius:16px;padding:8px 12px}
-.msg.mine .msg-audio{background:linear-gradient(135deg,#f59e0b,#dc2626);border-bottom-right-radius:4px}
-.msg.other .msg-audio{background:var(--surface2);border-bottom-left-radius:4px}
-.msg-audio audio{height:36px;width:208px;filter:invert(.85) hue-rotate(180deg)}
-.msg.mine .msg-audio audio{filter:invert(.1)}
-.typing-indicator{font-size:13px;color:var(--dim);padding:4px 16px;font-style:italic}
+    .invite-btn { 
+      padding: 6px 12px; 
+      background: #edf2f7; 
+      color: #319795; 
+      border: none; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .invite-btn:hover { background: #e2e8f0; }
 
-.composer{padding:12px;background:rgba(24,24,27,.8);backdrop-filter:blur(16px);border-top:1px solid var(--border);flex-shrink:0}
-.composer-inner{display:flex;align-items:flex-end;gap:6px;background:rgba(9,9,11,.6);border:1px solid var(--border);border-radius:16px;padding:6px;transition:border-color .2s}
-.composer-inner:focus-within{border-color:rgba(245,158,11,.3)}
-.composer-btn{padding:8px;border-radius:8px;color:var(--muted);transition:all .15s;display:flex;align-items:center;justify-content:center;position:relative}
-.composer-btn:hover{color:var(--amber);background:var(--surface2)}
-.composer-btn svg{width:22px;height:22px;fill:currentColor}
-.composer-input{flex:1;background:transparent;border:none;color:var(--text);resize:none;font-size:15px;padding:8px 4px;max-height:96px;min-width:0}
-.composer-input::placeholder{color:#52525b}
-.composer-send{padding:10px;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#dc2626);color:#09090b;flex-shrink:0;transition:all .15s}
-.composer-send:disabled{opacity:.3;cursor:not-allowed}
-.composer-send svg{width:20px;height:20px;fill:currentColor}
-.composer-send:not(:disabled):hover{transform:scale(1.05)}
+    /* Панель логов */
+    .logs-container { 
+      display: none; 
+      flex-direction: column; 
+      background: #1e293b; 
+      border-bottom: 1px solid #334155; 
+    }
+    .logs-header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      padding: 8px 12px; 
+      background: #0f172a; 
+      color: #94a3b8; 
+      font-size: 11px; 
+    }
+    .copy-log-btn { 
+      background: var(--primary); 
+      color: white; 
+      border: none; 
+      padding: 4px 8px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      font-size: 10px; 
+    }
+    .logs-panel { 
+      height: 120px; 
+      color: #38bdf8; 
+      font-family: ui-monospace, SFMono-Regular, monospace; 
+      font-size: 11px; 
+      padding: 10px; 
+      overflow-y: auto; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 4px; 
+    }
+    .logs-panel .log-entry.err { color: #f87171; }
 
-/* Emoji picker */
-.emoji-picker{position:absolute;bottom:100%;margin-bottom:8px;left:0;z-index:50;width:288px;background:var(--surface);border:1px solid rgba(245,158,11,.3);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.5);overflow:hidden}
-.emoji-tabs{display:flex;border-bottom:1px solid var(--border)}
-.emoji-tab{flex:1;font-size:12px;padding:8px 4px;color:var(--dim);transition:all .15s}
-.emoji-tab.active{color:var(--amber);background:rgba(39,39,42,.6)}
-.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:8px;max-height:192px;overflow-y:auto}
-.emoji-grid button{font-size:20px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .1s}
-.emoji-grid button:hover{background:var(--surface2)}
+    /* Окно сообщений */
+    .messages { 
+      flex: 1; 
+      padding: 16px; 
+      overflow-y: auto; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 12px; 
+      background: #fafafa;
+    }
+    .msg { 
+      max-width: 75%; 
+      padding: 10px 14px; 
+      border-radius: 16px; 
+      word-break: break-word; 
+      font-size: 14px; 
+      line-height: 1.4;
+      position: relative;
+    }
+    .msg-time {
+      font-size: 10px;
+      opacity: 0.7;
+      margin-top: 4px;
+      text-align: right;
+    }
+    .msg.my { 
+      align-self: flex-end; 
+      background: var(--msg-my); 
+      color: white; 
+      border-bottom-right-radius: 4px;
+    }
+    .msg.peer { 
+      align-self: flex-start; 
+      background: var(--msg-peer); 
+      color: #1f2937; 
+      border-bottom-left-radius: 4px;
+    }
+    .msg.system { 
+      align-self: center; 
+      background: #e0e7ff; 
+      color: #3730a3; 
+      font-size: 12px; 
+      border-radius: 20px;
+      padding: 4px 12px;
+    }
 
-/* Recording */
-.recording{display:flex;align-items:center;gap:12px;background:rgba(127,29,29,.4);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:8px 12px}
-.rec-dot{position:relative;display:flex;width:12px;height:12px}
-.rec-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:#ef4444;animation:ping 1s infinite}
-.rec-dot::before{content:'';position:absolute;inset:0;border-radius:50%;background:#ef4444;opacity:.75;animation:ping 1s infinite}
-@keyframes ping{75%,100%{transform:scale(2);opacity:0}}
-.rec-time{font-size:14px;color:#fca5a5;font-variant-numeric:tabular-nums}
-.rec-cancel{padding:6px;border-radius:8px;color:var(--muted);transition:all .15s}
-.rec-cancel:hover{color:var(--red-light);background:var(--surface2)}
-.rec-cancel svg{width:18px;height:18px;fill:currentColor}
-.rec-stop{padding:8px;border-radius:8px;background:var(--surface2);color:var(--text);transition:all .15s}
-.rec-stop:hover{background:#3f3f46}
-.rec-stop svg{width:18px;height:18px;fill:currentColor}
-.rec-preview{display:flex;align-items:center;gap:8px;background:rgba(9,9,11,.6);border:1px solid var(--border);border-radius:12px;padding:8px 12px}
-.rec-preview audio{flex:1;min-width:0;height:36px;filter:invert(.85) hue-rotate(180deg)}
-.rec-preview .rec-dur{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
-.rec-send{padding:8px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#dc2626);color:#09090b;transition:transform .15s}
-.rec-send:hover{transform:scale(1.05)}
-.rec-send svg{width:18px;height:18px;fill:currentColor}
+    /* Футер ввода */
+    .footer { 
+      padding: 12px 16px; 
+      display: flex; 
+      gap: 10px; 
+      border-top: 1px solid #f3f4f6; 
+      align-items: center; 
+      background: #ffffff;
+    }
+    .footer input { 
+      flex: 1; 
+      padding: 10px 16px; 
+      border: 1px solid #e5e7eb; 
+      border-radius: 24px; 
+      outline: none; 
+      font-size: 14px;
+      transition: border 0.2s;
+    }
+    .footer input:focus { border-color: var(--primary); }
+    
+    .emoji-btn, .send-btn { 
+      background: none; 
+      border: none; 
+      cursor: pointer; 
+      transition: transform 0.1s;
+    }
+    .emoji-btn { font-size: 22px; }
+    .send-btn { 
+      background: var(--primary); 
+      color: white; 
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .send-btn:hover { background: var(--primary-hover); }
 
-/* Participants sidebar */
-.sidebar{width:256px;background:rgba(24,24,27,.6);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
-.sidebar-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.sidebar-header svg{width:18px;height:18px;fill:rgba(245,158,11,.7)}
-.sidebar-header h2{font-size:14px;font-weight:600;color:#d4d4d8}
-.sidebar-count{margin-left:auto;font-size:12px;color:#52525b}
-.sidebar-list{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:4px}
-.sidebar-item{display:flex;align-items:center;gap:12px;padding:8px;border-radius:8px;transition:background .15s}
-.sidebar-item:hover{background:rgba(39,39,42,.5)}
-.sidebar-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#09090b;flex-shrink:0}
-.sidebar-info{flex:1;min-width:0}
-.sidebar-name{font-size:14px;color:#d4d4d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sidebar-status{font-size:12px;color:#52525b}
-.sidebar-dot{width:8px;height:8px;border-radius:50%;background:var(--emerald);flex-shrink:0}
-.sidebar-footer{padding:12px;border-top:1px solid var(--border)}
-.sidebar-invite{width:100%;padding:10px;border-radius:12px;background:var(--surface2);color:#d4d4d8;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
-.sidebar-invite:hover{background:#3f3f46}
-.sidebar-invite svg{width:16px;height:16px;fill:currentColor}
-
-/* Modal overlay */
-.overlay{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px}
-.modal{background:var(--surface);border:1px solid rgba(245,158,11,.3);border-radius:16px;padding:24px;width:100%;max-width:384px;box-shadow:0 16px 48px rgba(245,158,11,.1)}
-.modal-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
-.modal-title-wrap{display:flex;align-items:center;gap:12px}
-.modal-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#dc2626);display:flex;align-items:center;justify-content:center}
-.modal-icon svg{width:20px;height:20px;fill:#09090b}
-.modal-title{font-size:18px;font-weight:700;color:var(--text)}
-.modal-sub{font-size:12px;color:var(--dim)}
-.modal-close{padding:6px;border-radius:8px;color:var(--dim);transition:all .15s}
-.modal-close:hover{color:#d4d4d8;background:var(--surface2)}
-.modal-close svg{width:20px;height:20px;fill:currentColor}
-.modal-label{display:block;font-size:11px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
-.code-display{width:100%;background:rgba(9,9,11,.6);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:center;gap:12px;transition:border-color .15s;cursor:pointer}
-.code-display:hover{border-color:rgba(245,158,11,.4)}
-.code-display .code{font-size:30px;font-weight:900;letter-spacing:.3em;color:var(--amber);font-family:monospace}
-.code-display svg{width:18px;height:18px;fill:var(--dim)}
-.code-display .check{fill:var(--emerald)}
-.code-hint{font-size:12px;color:#52525b;text-align:center;margin-top:8px}
-.link-row{display:flex;gap:8px;margin-bottom:16px}
-.link-input{flex:1;min-width:0;background:rgba(9,9,11,.6);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted);font-family:monospace}
-.link-input:focus{border-color:rgba(245,158,11,.4)}
-.link-copy{padding:0 12px;border-radius:12px;background:var(--surface2);color:#d4d4d8;transition:background .15s;display:flex;align-items:center;justify-content:center}
-.link-copy:hover{background:#3f3f46}
-.link-copy svg{width:18px;height:18px;fill:currentColor}
-.btn-share{width:100%;padding:12px;border-radius:12px;background:linear-gradient(90deg,#f59e0b,#dc2626);color:#09090b;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s}
-.btn-share:hover{box-shadow:0 8px 24px rgba(220,38,38,.3)}
-.btn-share svg{width:18px;height:18px;fill:currentColor}
-.modal-foot{margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:#52525b}
-.modal-foot svg{width:14px;height:14px;fill:currentColor}
-
-/* Call modal */
-.call-modal{position:fixed;inset:0;z-index:100;background:rgba(9,9,11,.95);backdrop-filter:blur(16px);display:flex;flex-direction:column}
-.call-video-area{position:relative;flex:1;background:#000;overflow:hidden}
-.call-remote-video{width:100%;height:100%;object-fit:cover}
-.call-local-video{position:absolute;top:16px;right:16px;width:128px;height:176px;border-radius:12px;overflow:hidden;border:2px solid rgba(245,158,11,.4);background:var(--surface)}
-.call-local-video video{width:100%;height:100%;object-fit:cover}
-.call-video-off{position:absolute;top:16px;right:16px;width:128px;height:176px;border-radius:12px;background:var(--surface);display:flex;align-items:center;justify-content:center}
-.call-video-off svg{width:28px;height:28px;fill:#52525b}
-.call-info{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px}
-.call-avatar{position:relative;width:112px;height:112px}
-.call-avatar-ring{position:absolute;inset:0;border-radius:50%;background:rgba(245,158,11,.2);animation:ping 1.5s infinite}
-.call-avatar-ring2{position:absolute;inset:-16px;border-radius:50%;border:2px solid rgba(245,158,11,.2);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.call-avatar-inner{position:relative;width:112px;height:112px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#dc2626,#b91c1c);display:flex;align-items:center;justify-content:center;box-shadow:0 16px 48px rgba(245,158,11,.3)}
-.call-avatar-inner svg{width:48px;height:48px;fill:#09090b}
-.call-name{font-size:24px;font-weight:700;color:var(--text);text-align:center}
-.call-status-text{color:var(--dim);margin-top:4px;text-align:center}
-.call-controls{display:flex;align-items:center;gap:16px;margin-top:16px}
-.call-ctrl-btn{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s}
-.call-ctrl-btn.muted{background:var(--surface2);color:#d4d4d8}
-.call-ctrl-btn.muted:hover{background:#3f3f46}
-.call-ctrl-btn.unmuted{background:var(--surface2);color:var(--text)}
-.call-ctrl-btn.unmuted:hover{background:#3f3f46}
-.call-ctrl-btn svg{width:24px;height:24px;fill:currentColor}
-.call-bottom{display:flex;align-items:center;justify-content:center;gap:24px;padding:32px;background:rgba(9,9,11,.8);border-top:1px solid var(--border)}
-.call-end{width:64px;height:64px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(220,38,38,.3);transition:all .15s}
-.call-end:hover{background:var(--red-light);transform:scale(1.05)}
-.call-end:active{transform:scale(.95)}
-.call-end svg{width:28px;height:28px;fill:currentColor}
-.call-accept{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#10b981);color:#09090b;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(16,185,129,.3);transition:all .15s}
-.call-accept:hover{transform:scale(1.05)}
-.call-accept:active{transform:scale(.95)}
-.call-accept svg{width:28px;height:28px;fill:currentColor}
-
-/* Toast */
-#toast-container{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
-.toast{background:rgba(0,0,0,.85);color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.4);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);animation:slideDown .3s ease;pointer-events:auto}
-.toast.error{border-left:4px solid var(--red)}
-.toast.success{border-left:4px solid var(--emerald)}
-.toast.info{border-left:4px solid var(--amber)}
-@keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
-
-/* Responsive */
-@media(max-width:640px){
-  .sidebar{display:none}
-  .features span{font-size:9px}
-}
-</style>
+    .emoji-picker { 
+      display: none; 
+      padding: 10px; 
+      background: #ffffff; 
+      border-top: 1px solid #f3f4f6; 
+      gap: 12px; 
+      font-size: 22px; 
+      justify-content: space-around; 
+    }
+    .emoji-picker span { cursor: pointer; transition: transform 0.1s; }
+    .emoji-picker span:hover { transform: scale(1.2); }
+  </style>
 </head>
 <body>
-<div id="app"></div>
-<div id="toast-container"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm" type="module"></script>
-<script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
+<div class="chat-card">
+  <!-- Шапка -->
+  <div class="header">
+    <h3>P2P Чат</h3>
+    <div class="header-btns">
+      <button class="btn log-btn" onclick="toggleLogs()">📜 Логи</button>
+      <button class="btn call-btn" onclick="startCall()">📞 Звонок</button>
+    </div>
+  </div>
 
-// ── Config ──
-// !! ЗАМЕНИТЕ НА СВОИ ДАННЫЕ !!
-const SUPABASE_URL = 'PASTE_YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true },
-  realtime: { params: { eventsPerSecond: 20 } },
-});
+  <!-- Статус и приглашение -->
+  <div class="invite-bar">
+    <div class="status-badge">
+      <div id="status-dot" class="status-dot"></div>
+      <span id="status-text">Инициализация...</span>
+    </div>
+    <button class="invite-btn" onclick="copyInviteLink()">📋 Ссылка-приглашение</button>
+  </div>
 
-// ── TURN / STUN конфигурация (можно заменить на свои) ──
-// Бесплатный TURN можно получить на https://xirsys.com или https://www.twilio.com/stun-turn
-// Пример с Xirsys (замените APP_NAME и ключи)
-async function getIceServers() {
-  try {
-    // Если у вас есть готовый ответ с сервера – используйте его.
-    // Для демонстрации – статический список STUN
-    return [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      // Добавьте TURN серверы, если есть
-    ];
-  } catch { return [{ urls: 'stun:stun.l.google.com:19302' }]; }
-}
+  <!-- Контейнер логов -->
+  <div class="logs-container" id="logs-container">
+    <div class="logs-header">
+      <span>Журнал событий</span>
+      <button class="copy-log-btn" onclick="copyAllLogs()">Копировать</button>
+    </div>
+    <div class="logs-panel" id="logs-panel"></div>
+  </div>
 
-// ── Identity ──
-function getPeerId() {
-  let id = localStorage.getItem('ssha_peer_id');
-  if (!id) { id = 'p-' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); localStorage.setItem('ssha_peer_id', id); }
-  return id;
-}
-function getStoredName() { return localStorage.getItem('ssha_name') ?? ''; }
-function setStoredName(n) { localStorage.setItem('ssha_name', n); }
-async function generateUniqueCode() {
-  let code, exists, attempts = 0;
-  do {
-    const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let c=''; for(let i=0;i<6;i++) c+=a[Math.floor(Math.random()*a.length)];
-    code = c;
-    const { data } = await supabase.from('chat_rooms').select('id').eq('invite_code', code).maybeSingle();
-    exists = !!data;
-    attempts++;
-  } while (exists && attempts < 20);
-  if (exists) throw new Error('Не удалось сгенерировать уникальный код, попробуйте позже');
-  return code;
-}
-function avatarColor(s) { const cs=['from-amber-400 to-red-500','from-cyan-400 to-blue-500','from-emerald-400 to-teal-500','from-fuchsia-400 to-pink-500','from-rose-400 to-orange-500','from-lime-400 to-green-500','from-sky-400 to-indigo-500','from-violet-400 to-purple-500']; let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))&0xffffffff; return cs[Math.abs(h)%cs.length]; }
-function initials(n) { const p=n.trim().split(/\s+/).filter(Boolean); if(!p.length) return '?'; return p.length===1?p[0].slice(0,2).toUpperCase():(p[0][0]+p[1][0]).toUpperCase(); }
-function fmtTime(s) { const m=Math.floor(s/60); const sec=s%60; return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0'); }
-function fmtTimeStr(iso) { return new Date(iso).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }
-function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  <!-- Чат -->
+  <div class="messages" id="messages"></div>
 
-// ── Toast ──
-function showToast(text, type = 'info') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = text;
-  container.appendChild(toast);
-  setTimeout(() => { toast.remove(); }, 5000);
-}
+  <!-- Панель эмодзи -->
+  <div class="emoji-picker" id="emoji-picker">
+    <span onclick="addEmoji('😀')">😀</span>
+    <span onclick="addEmoji('😂')">😂</span>
+    <span onclick="addEmoji('❤️')">❤️</span>
+    <span onclick="addEmoji('👍')">👍</span>
+    <span onclick="addEmoji('🔥')">🔥</span>
+    <span onclick="addEmoji('🎉')">🎉</span>
+  </div>
 
-// ── Звук уведомления ──
-function playNotificationSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
-  } catch {}
-}
+  <!-- Поле ввода -->
+  <div class="footer">
+    <button class="emoji-btn" onclick="toggleEmoji()">😊</button>
+    <input type="text" id="message-input" placeholder="Введите сообщение..." onkeydown="if(event.key==='Enter') sendMessage()">
+    <button class="send-btn" onclick="sendMessage()">➤</button>
+  </div>
+</div>
 
-// ── State ──
-let me = getPeerId();
-let currentRoom = null;
-let displayName = '';
-let messages = [];
-let participants = [];
-let channels = [];
-let callManager = null;
-let emojiOpen = false;
-let emojiCategory = 0;
-let recording = null;
-let previewUrl = null;
-let uploading = false;
-let callState = 'idle';
-let callPeer = null;
-let callWithVideo = false;
-let callIsInitiator = false;
-let localStream = null;
-let remoteStream = null;
-let incomingCall = null;
-let muted = false;
-let videoOff = false;
-let callSeconds = 0;
-let callTimer = null;
+<audio id="remote-audio" autoplay></audio>
 
-// Пагинация
-let offset = 0;
-const LIMIT = 50;
-let hasMore = true;
-let isLoading = false;
+<script>
+  let rawLogs = [];
 
-// Индикация печатания
-let typingTimeout = null;
-let typingPeers = {}; // { peerId: displayName }
+  function log(msg, isErr = false) {
+    const time = new Date().toLocaleTimeString();
+    const formatted = `[${time}] ${msg}`;
+    rawLogs.push(formatted);
 
-const EMOJI_CATS = [
-  { name:'Часто', emojis:['😀','😂','❤️','👍','🔥','🎉','👀','🙏','💯','😎','🤔','😭','🥳','😡','💀','🤝'] },
-  { name:'Лица', emojis:['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','😇','🥰','😍','🤩','😘','😋','😛','😜','🤪','🤗','🤭','🤫','🤔','🤐','😐','😑','😶','😏','😒','🙄','😬','😔','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱'] },
-  { name:'Жесты', emojis:['👍','👎','👌','✌️','🤞','🤟','🤘','👈','👉','👆','👇','✋','🖖','👋','🤙','💪','🙏','👏','🙌','🤝','✊','👊'] },
-  { name:'Символы', emojis:['❤️','🧡','💛','💚','💙','💜','🖤','💔','💖','✨','⭐','🌟','💫','🔥','💥','💯','🎉','🎊','🎁','🏆','⚡','💎','🎯'] },
-];
-
-// ── Icons (сокращённо) ──
-const IC = {
-  radio:'<svg viewBox="0 0 24 24"><path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2H5.5a2.5 2.5 0 00-2.26 2.15M7 20a3 3 0 110-6 3 3 0 010 6m13-8h-6v4h6v-4z"/></svg>',
-  arrow:'<svg viewBox="0 0 24 24"><path d="M4 11v2h12l-5 5 1.4 1.4L19.8 12 12.4 4.6 11 6l5 5H4z"/></svg>',
-  hash:'<svg viewBox="0 0 24 24"><path d="M5.5 4l-.5 4h4l.5-4h2l-.5 4h4l.5-4h2l-.5 4H20v2h-3.5l-.5 4H20v2h-4.5l-.5 4h-2l.5-4h-4l-.5 4h-2l.5-4H4v-2h3.5l.5-4H4V8h4.5l.5-4h2M10 10l-.5 4h4l.5-4h-4z"/></svg>',
-  users:'<svg viewBox="0 0 24 24"><path d="M16 17v2H2v-2s0-4 7-4 7 4 7 4m-3.5-7.5A3.5 3.5 0 109 6a3.5 3.5 0 003.5 3.5m3.44 5.5A5.32 5.32 0 0118 17v2h4v-2s0-3.63-6.06-4M15 4a3.39 3.39 0 00-1.93.59A5 5 0 0114 6.5a5 5 0 01-.93 1.91A3.39 3.39 0 0015 9.5a3.5 3.5 0 000-7z"/></svg>',
-  shield:'<svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4m-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>',
-  send:'<svg viewBox="0 0 24 24"><path d="M2 21l23-9L2 3v7l15 2-15 2v7z"/></svg>',
-  logout:'<svg viewBox="0 0 24 24"><path d="M16 17l5-5-5-5v3H9v4h7M4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>',
-  img:'<svg viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2M8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg>',
-  phone:'<svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>',
-  video:'<svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>',
-  videoOff:'<svg viewBox="0 0 24 24"><path d="M21 6h-2.17L17 4.17V4a1 1 0 00-1-1H8a1 1 0 00-1 1v.17L5.17 6H3a1 1 0 00-1 1v10a1 1 0 001 1h2.17L7 19.83V20a1 1 0 001 1h8a1 1 0 001-1v-.17L18.83 18H21a1 1 0 001-1V7a1 1 0 00-1-1M3 7h2.17l1 1H3V7m6 13v-1l6-6 1 1v6H9m0-9l4-4 1 1-4 4-1-1m5 9l-1-1 4-4 1 1-4 4z"/></svg>',
-  link:'<svg viewBox="0 0 24 24"><path d="M3.9 12a3.1 3.1 0 013.1-3.1h4V7H7a5 5 0 00-5 5 5 5 0 005 5h4v-1.9H7A3.1 3.1 0 013.9 12M8 13h8v-2H8v2m9-6h-4v1.9h4a3.1 3.1 0 010 6.2h-4V17h4a5 5 0 005-5 5 5 0 00-5-5z"/></svg>',
-  copy:'<svg viewBox="0 0 24 24"><path d="M18 2H9c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h9c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2M6 4v12H4V4c0-1.1.9-2 2-2v2z"/></svg>',
-  check:'<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
-  share:'<svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>',
-  x:'<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
-  mic:'<svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3m5 9a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>',
-  micOff:'<svg viewBox="0 0 24 24"><path d="M19 11h-2a5 5 0 01-1.5 3.5l-1.42-1.42A3 3 0 0015 11V5a3 3 0 00-6 0v1.5l7.45 7.45A4.97 4.97 0 0019 11M12 14a3 3 0 01-3-3V8.5l5.93 5.93A3 3 0 0112 14M19 17.57L15.43 14H15a5 5 0 01-5 5v1h-2v-1a7 7 0 01-6-7h2a5 5 0 005 5c.36 0 .71-.04 1.05-.11L8.5 20.5 7.09 19.07l2.71-2.71A5 5 0 0012 17a5 5 0 005-5h-1.43l4.34 4.34L19 17.57z"/></svg>',
-  phoneOff:'<svg viewBox="0 0 24 24"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.956.956 0 01-.29-.7c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48a.956.956 0 01-.71.29c-.27 0-.52-.1-.7-.28a11.27 11.27 0 00-2.67-1.85.996.996 0 01-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>',
-  userCheck:'<svg viewBox="0 0 24 24"><path d="M9 11a4 4 0 004-4 4 4 0 00-4-4 4 4 0 00-4 4 4 4 0 004 4m6.5 0a2.5 2.5 0 002.5-2.5 2.5 2.5 0 00-2.5-2.5 2.5 2.5 0 00-2.5 2.5 2.5 2.5 0 002.5 2.5M9 13c-2.67 0-8 1.34-8 4v3h10v-3c0-2.66-5.33-4-8-4m6.5 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h6v-3c0-2.66-5.33-4-8-4z"/></svg>',
-  smile:'<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-10 10 10 10 0 0010 10 10 10 0 0010-10A10 10 0 0012 2m3.5 6A1.5 1.5 0 0117 9.5a1.5 1.5 0 01-1.5 1.5A1.5 1.5 0 0114 9.5 1.5 1.5 0 0115.5 8m-7 0A1.5 1.5 0 0110 9.5 1.5 1.5 0 018.5 11 1.5 1.5 0 017 9.5 1.5 1.5 0 018.5 8m3.5 9.5c-2.33 0-4.31-1.46-5.11-3.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5z"/></svg>',
-  trash:'<svg viewBox="0 0 24 24"><path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12z"/></svg>',
-  square:'<svg viewBox="0 0 24 24"><path d="M16 16H8V8h8v8z"/></svg>',
-  alert:'<svg viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21z"/></svg>',
-};
-
-// ── Call Manager (упрощённо, но с TURN) ──
-class CallManager {
-  constructor(me, roomId, handlers) {
-    this.me = me; this.roomId = roomId; this.handlers = handlers;
-    this.pending = null; this.channel = null; this.state = 'idle';
-    this.signalQueue = []; this.channelReady = false;
+    const logsPanel = document.getElementById('logs-panel');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${isErr ? 'err' : ''}`;
+    entry.innerText = formatted;
+    logsPanel.appendChild(entry);
+    logsPanel.scrollTop = logsPanel.scrollHeight;
+    console.log(`[LOG] ${msg}`);
   }
-  async start() {
-    this.channel = supabase.channel(`call-${this.roomId}-${this.me}`);
-    this.channel.on('postgres_changes',
-      { event:'INSERT', schema:'public', table:'call_signals', filter:`to_peer=eq.${this.me}` },
-      (p) => this.handleSignal(p.new));
-    this.channel.subscribe((s) => { if (s==='SUBSCRIBED') { this.channelReady=true; this.flushQueue(); } });
+
+  function setStatus(text, state = 'default') {
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('status-dot');
+    statusText.innerText = text;
+    statusDot.className = `status-dot ${state}`;
   }
-  setState(s) { this.state=s; this.handlers.onStateChange(s); }
-  async sendSignal(to, kind, payload) {
-    const row = { room_id:this.roomId, from_peer:this.me, to_peer:to, kind, payload };
-    if (this.channelReady) await supabase.from('call_signals').insert(row);
-    else this.signalQueue.push({ ...row, id:'', created_at:'' });
+
+  function copyAllLogs() {
+    if (rawLogs.length === 0) return alert("Логи пусты!");
+    navigator.clipboard.writeText(rawLogs.join('\n')).then(() => {
+      alert("Логи скопированы!");
+    });
   }
-  async flushQueue() {
-    if (!this.channelReady || !this.signalQueue.length) return;
-    const q = this.signalQueue; this.signalQueue = [];
-    for (const s of q) await supabase.from('call_signals').insert({ room_id:s.room_id, from_peer:s.from_peer, to_peer:s.to_peer, kind:s.kind, payload:s.payload });
-  }
-  async initiateCall(peerId, name, withVideo) {
-    if (this.pending) return;
-    const iceServers = await getIceServers();
-    const pc = new RTCPeerConnection({ iceServers });
-    let ls;
-    try { ls = await navigator.mediaDevices.getUserMedia({ audio:true, video: withVideo?{width:640,height:480}:false }); }
-    catch { this.handlers.onCallEnded('Нет доступа к камере/микрофону'); pc.close(); return; }
-    this.handlers.onLocalStream(ls);
-    this.pending = { peerId, displayName:name, isInitiator:true, withVideo, pc, localStream:ls, remoteStream:new MediaStream(), pendingCandidates:[], remoteDescriptionSet:false, callTimer:setTimeout(()=>{ if(this.pending?.isInitiator&&this.state!=='connected') this.cleanup('Нет ответа'); },45000) };
-    this.setupPc(pc);
-    ls.getTracks().forEach(t => pc.addTrack(t, ls));
-    try {
-      const offer = await pc.createOffer({ offerToReceiveAudio:true, offerToReceiveVideo:withVideo });
-      await pc.setLocalDescription(offer);
-      await this.sendSignal(peerId, 'offer', { sdp:offer.sdp, video:withVideo });
-      this.setState('calling');
-    } catch { this.cleanup('Ошибка создания вызова'); }
-  }
-  async handleSignal(sig) {
-    const p = sig.payload;
-    if (sig.from_peer === this.me) return;
-    if (sig.kind === 'offer') {
-      if (this.pending) { await this.sendSignal(sig.from_peer,'reject',{reason:'busy'}); return; }
-      const withVideo = !!p.video;
-      const iceServers = await getIceServers();
-      const pc = new RTCPeerConnection({ iceServers });
-      this.pending = { peerId:sig.from_peer, displayName:'Участник', isInitiator:false, withVideo, pc, localStream:null, remoteStream:new MediaStream(), pendingCandidates:[], remoteDescriptionSet:false, offerSdp:p.sdp, callTimer:null };
-      this.setupPc(pc);
-      window.dispatchEvent(new CustomEvent('incoming-call',{ detail:{ from:sig.from_peer, video:withVideo } }));
-      this.setState('ringing'); return;
+
+  log("Инициализация PeerJS...");
+
+  const peer = new Peer({
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
+      ]
     }
-    if (!this.pending || this.pending.peerId !== sig.from_peer) return;
-    const pc = this.pending.pc;
-    if (sig.kind === 'reject') { this.cleanup('Звонок отклонён'); return; }
-    if (sig.kind === 'hangup') { this.cleanup('Собеседник завершил звонок'); return; }
-    if (sig.kind === 'answer') {
-      try { await pc.setRemoteDescription({ type:'answer', sdp:p.sdp }); this.pending.remoteDescriptionSet=true; await this.flushCandidates(); if(this.pending.callTimer){clearTimeout(this.pending.callTimer);this.pending.callTimer=null;} }
-      catch { this.cleanup('Ошибка подключения'); }
-      return;
-    }
-    if (sig.kind === 'ice') {
-      const c = { candidate:p.candidate, sdpMid:p.sdpMid??null, sdpMLineIndex:p.sdpMLineIndex??null };
-      if (this.pending.remoteDescriptionSet) { try { await pc.addIceCandidate(c); } catch {} }
-      else this.pending.pendingCandidates.push(c);
-    }
-  }
-  async flushCandidates() {
-    if (!this.pending) return;
-    const cs = this.pending.pendingCandidates; this.pending.pendingCandidates = [];
-    for (const c of cs) { try { await this.pending.pc.addIceCandidate(c); } catch {} }
-  }
-  setupPc(pc) {
-    let dt = null;
-    pc.onicecandidate = (e) => { if (e.candidate && this.pending) this.sendSignal(this.pending.peerId,'ice',{ candidate:e.candidate.candidate, sdpMid:e.candidate.sdpMid, sdpMLineIndex:e.candidate.sdpMLineIndex }); };
-    pc.ontrack = (e) => { if (this.pending) { this.pending.remoteStream.addTrack(e.track); this.handlers.onRemoteStream(this.pending.remoteStream); } };
-    pc.oniceconnectionstatechange = () => {
-      const s = pc.iceConnectionState;
-      if (s==='connected'||s==='completed') { if(dt){clearTimeout(dt);dt=null;} if(this.state!=='connected') this.setState('connected'); }
-      else if (s==='disconnected') { if(!dt) dt=setTimeout(()=>{ if(this.pending&&pc.iceConnectionState==='disconnected') this.cleanup('Соединение потеряно'); },10000); }
-      else if (s==='failed') { if(dt){clearTimeout(dt);dt=null;} this.cleanup('Соединение потеряно'); }
-    };
-    pc.onconnectionstatechange = () => { if (pc.connectionState==='failed') this.cleanup('Соединение потеряно'); };
-  }
-  async acceptCall(withVideo) {
-    if (!this.pending || this.pending.isInitiator) return;
-    this.pending.withVideo = withVideo;
-    const pc = this.pending.pc;
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio:true, video: withVideo?{width:640,height:480}:false });
-      this.pending.localStream = s; this.handlers.onLocalStream(s);
-      s.getTracks().forEach(t => pc.addTrack(t, s));
-      if (this.pending.offerSdp) { await pc.setRemoteDescription({ type:'offer', sdp:this.pending.offerSdp }); this.pending.remoteDescriptionSet=true; }
-      const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
-      await this.sendSignal(this.pending.peerId, 'answer', { sdp:ans.sdp });
-      await this.flushCandidates();
-    } catch { this.cleanup('Нет доступа к камере/микрофону'); }
-  }
-  rejectCall() { if (this.pending && !this.pending.isInitiator) this.sendSignal(this.pending.peerId,'reject',{reason:'declined'}); this.cleanup('Звонок отклонён'); }
-  endCall() { if (this.pending) this.sendSignal(this.pending.peerId,'hangup',{}); this.cleanup('Звонок завершён'); }
-  cleanup(reason) {
-    if (this.pending) { if(this.pending.callTimer) clearTimeout(this.pending.callTimer); this.pending.pc.close(); this.pending.localStream?.getTracks().forEach(t=>t.stop()); this.pending.remoteStream.getTracks().forEach(t=>t.stop()); this.pending=null; }
-    this.setState('idle'); this.handlers.onCallEnded(reason);
-  }
-  stop() { this.endCall(); if (this.channel) { supabase.removeChannel(this.channel); this.channel=null; } }
-}
-
-// ── Render helpers ──
-const app = document.getElementById('app');
-
-function renderWelcome() {
-  const user = supabase.auth.user();
-  const isAuth = !!user;
-  const name = user?.user_metadata?.full_name || user?.email || getStoredName() || '';
-  app.innerHTML = `
-    <div class="welcome">
-      <div class="welcome-glow1"></div><div class="welcome-glow2"></div>
-      <div class="welcome-wrap">
-        <div class="logo-wrap">
-          <div class="logo-icon">${IC.radio}</div>
-          <div class="logo-title">СШ·ЧАТ</div>
-          <div class="logo-sub">Secure Soviet Hub</div>
-        </div>
-        <div class="card">
-          <div class="auth-buttons">
-            ${isAuth ? `<button class="auth-btn" id="logout-btn">Выйти (${escapeHtml(name)})</button>` :
-            `<button class="auth-btn primary" id="login-email-btn">Войти по почте</button>
-             <button class="auth-btn" id="login-google-btn">Google</button>`}
-          </div>
-          <div class="tabs">
-            <button class="tab active" id="tab-create">Создать чат</button>
-            <button class="tab" id="tab-join">По коду</button>
-          </div>
-          <form id="welcome-form">
-            <div class="field">
-              <label>Ваше имя (отображается в чате)</label>
-              <input id="name-input" placeholder="Например, Товарищ" maxlength="24" value="${escapeHtml(name)}">
-            </div>
-            ${!isAuth ? `<div class="field">
-              <label>Пароль для защиты чата (опционально)</label>
-              <input id="password-input" type="password" placeholder="Оставьте пустым для открытого чата">
-            </div>` : ''}
-            <div class="field hidden" id="code-field">
-              <label>Код приглашения</label>
-              <input id="code-input" placeholder="ABC123" maxlength="8" style="text-transform:uppercase;font-family:monospace;font-size:18px;letter-spacing:.1em;text-align:center">
-            </div>
-            <div class="error hidden" id="welcome-error"></div>
-            <button type="submit" class="btn-primary" id="welcome-submit">Создать чат ${IC.arrow}</button>
-          </form>
-          <div class="hint hidden" id="create-hint">${IC.hash}<span>Вы получите уникальный код приглашения, которым сможете поделиться с друзьями.</span></div>
-        </div>
-        <div class="features">
-          <div class="feature">${IC.users}<span>Группы</span></div>
-          <div class="feature">${IC.shield}<span>P2P звонки</span></div>
-          <div class="feature">${IC.radio}<span>Реалтайм</span></div>
-        </div>
-      </div>
-    </div>`;
-  // Обработчики
-  let mode = 'create';
-  const tabCreate = document.getElementById('tab-create');
-  const tabJoin = document.getElementById('tab-join');
-  const codeField = document.getElementById('code-field');
-  const submitBtn = document.getElementById('welcome-submit');
-  const createHint = document.getElementById('create-hint');
-  tabCreate.onclick = () => { mode='create'; tabCreate.classList.add('active'); tabJoin.classList.remove('active'); codeField.classList.add('hidden'); createHint.classList.add('hidden'); submitBtn.innerHTML = `Создать чат ${IC.arrow}`; };
-  tabJoin.onclick = () => { mode='join'; tabJoin.classList.add('active'); tabCreate.classList.remove('active'); codeField.classList.remove('hidden'); createHint.classList.add('hidden'); submitBtn.innerHTML = `Войти в чат ${IC.arrow}`; };
-  document.getElementById('welcome-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('name-input').value.trim();
-    const errEl = document.getElementById('welcome-error');
-    if (name.length < 2) { errEl.textContent = 'Имя слишком короткое'; errEl.classList.remove('hidden'); return; }
-    setStoredName(name);
-    if (mode === 'join') {
-      const code = document.getElementById('code-input').value.trim().toUpperCase();
-      if (code.length < 4) { errEl.textContent = 'Введите код приглашения'; errEl.classList.remove('hidden'); return; }
-      // Если есть пароль, запрашиваем (но у нас нет поля для пароля при входе – можно добавить в модалку)
-      const password = ''; // пока без пароля
-      await enterChat(name, code, password);
-    } else {
-      const password = document.getElementById('password-input')?.value || '';
-      await enterChat(name, null, password);
-    }
-  };
-  // Auth
-  const loginEmailBtn = document.getElementById('login-email-btn');
-  const loginGoogleBtn = document.getElementById('login-google-btn');
-  const logoutBtn = document.getElementById('logout-btn');
-  if (loginEmailBtn) loginEmailBtn.onclick = async () => {
-    const email = prompt('Введите email:');
-    if (!email) return;
-    const pass = prompt('Введите пароль:');
-    if (!pass) return;
-    try {
-      const { error } = await supabase.auth.signIn({ email, password: pass });
-      if (error) throw error;
-      showToast('Успешный вход', 'success');
-      renderWelcome();
-    } catch (e) { showToast(e.message, 'error'); }
-  };
-  if (loginGoogleBtn) loginGoogleBtn.onclick = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-      if (error) throw error;
-    } catch (e) { showToast(e.message, 'error'); }
-  };
-  if (logoutBtn) logoutBtn.onclick = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('ssha_peer_id');
-    sessionStorage.removeItem('ssha_session');
-    showToast('Вы вышли', 'info');
-    renderWelcome();
-  };
-}
-
-async function enterChat(name, inviteCode, password) {
-  let room = null;
-  if (inviteCode) {
-    // Проверить, существует ли комната
-    const { data } = await supabase.from('chat_rooms').select('*').eq('invite_code', inviteCode).maybeSingle();
-    room = data;
-    if (!room) {
-      // Если не существует – создаём новую (но обычно при входе по коду она должна существовать)
-      showToast('Комната не найдена, создаём новую', 'info');
-      const newCode = await generateUniqueCode();
-      const { data: created } = await supabase.from('chat_rooms').insert({ name:`Чат ${newCode}`, invite_code:newCode, is_private:!!password, password_hash:password || null }).select('*').single();
-      room = created;
-    } else {
-      // Если приватная и пароль задан – проверяем (пока пропускаем)
-    }
-  } else {
-    // Создание новой
-    const code = await generateUniqueCode();
-    const { data } = await supabase.from('chat_rooms').insert({ name:`Чат ${code}`, invite_code:code, is_private:!!password, password_hash:password || null }).select('*').single();
-    room = data;
-  }
-  if (room) {
-    currentRoom = room; displayName = name;
-    sessionStorage.setItem('ssha_session', JSON.stringify({ room, displayName:name }));
-    renderChat();
-    initChat();
-  } else {
-    showToast('Не удалось создать/найти комнату', 'error');
-  }
-}
-
-function renderChat() {
-  app.innerHTML = `
-    <div class="chat">
-      <header class="header">
-        <div class="header-avatar">СС</div>
-        <div class="header-info">
-          <div class="header-name" id="room-name">${escapeHtml(currentRoom.name)}</div>
-          <div class="header-status"><span class="status-dot offline" id="status-dot"></span><span id="status-text">Один в чате</span></div>
-        </div>
-        <button class="header-btn" id="call-btn" disabled title="Аудиозвонок">${IC.phone}</button>
-        <button class="header-btn" id="video-btn" disabled title="Видеозвонок">${IC.video}</button>
-        <div class="header-divider"></div>
-        <button class="header-btn" id="invite-btn" title="Пригласить">${IC.link}</button>
-        <button class="header-btn" id="members-btn" title="Участники">${IC.users}</button>
-        <button class="header-btn" id="leave-btn" title="Выйти">${IC.logout}</button>
-      </header>
-      <div class="chat-body">
-        <div class="messages-wrap">
-          <div class="messages" id="messages"></div>
-          <div id="typing-indicator" class="typing-indicator hidden"></div>
-          <div class="composer">
-            <div class="composer-inner" id="composer-inner">
-              <button class="composer-btn" id="emoji-btn" title="Эмодзи">${IC.smile}</button>
-              <span id="audio-rec-area"></span>
-              <button class="composer-btn" id="img-btn" title="Фото">${IC.img}</button>
-              <input type="file" id="file-input" accept="image/*" class="hidden">
-              <textarea class="composer-input" id="msg-input" placeholder="Сообщение..." rows="1"></textarea>
-              <button class="composer-send" id="send-btn" disabled>${IC.send}</button>
-            </div>
-          </div>
-        </div>
-        <aside class="sidebar hidden" id="sidebar">
-          <div class="sidebar-header">${IC.users}<h2>Участники</h2><span class="sidebar-count" id="sidebar-count">0</span></div>
-          <div class="sidebar-list" id="sidebar-list"></div>
-          <div class="sidebar-footer"><button class="sidebar-invite" id="sidebar-invite">${IC.link} Пригласить</button></div>
-        </aside>
-      </div>
-      <div id="modal-area"></div>
-      <div id="call-area"></div>
-    </div>`;
-  document.getElementById('leave-btn').onclick = leaveChat;
-  document.getElementById('invite-btn').onclick = showInvite;
-  document.getElementById('sidebar-invite').onclick = showInvite;
-  document.getElementById('members-btn').onclick = () => document.getElementById('sidebar').classList.toggle('hidden');
-  document.getElementById('call-btn').onclick = () => startCall(false);
-  document.getElementById('video-btn').onclick = () => startCall(true);
-  document.getElementById('img-btn').onclick = () => document.getElementById('file-input').click();
-  document.getElementById('file-input').onchange = handleImageUpload;
-  const input = document.getElementById('msg-input');
-  input.oninput = () => {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 96) + 'px';
-    document.getElementById('send-btn').disabled = !input.value.trim();
-    // Индикация печатания
-    clearTimeout(typingTimeout);
-    if (input.value.trim()) {
-      supabase.from('typing_indicators').upsert({
-        room_id: currentRoom.id,
-        peer_id: me,
-        display_name: displayName,
-        updated_at: new Date().toISOString()
-      }).catch(()=>{});
-      typingTimeout = setTimeout(() => {
-        supabase.from('typing_indicators').delete().eq('room_id', currentRoom.id).eq('peer_id', me).catch(()=>{});
-      }, 2000);
-    } else {
-      supabase.from('typing_indicators').delete().eq('room_id', currentRoom.id).eq('peer_id', me).catch(()=>{});
-    }
-  };
-  input.onkeydown = (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendText(); } };
-  document.getElementById('send-btn').onclick = sendText;
-  document.getElementById('emoji-btn').onclick = toggleEmoji;
-  renderAudioRecorder();
-  // Загрузка сообщений
-  offset = 0; hasMore = true; messages = [];
-  loadMessages(true);
-}
-
-// ── Пагинация сообщений ──
-async function loadMessages(force = false) {
-  if (isLoading || (!hasMore && !force)) return;
-  isLoading = true;
-  try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('room_id', currentRoom.id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + LIMIT - 1);
-    if (error) throw error;
-    if (data.length < LIMIT) hasMore = false;
-    const newMsgs = data.reverse(); // порядок возрастания
-    if (force) { messages = newMsgs; } else { messages = [...newMsgs, ...messages]; }
-    offset += data.length;
-    renderMessages();
-  } catch (e) {
-    showToast('Ошибка загрузки сообщений: ' + e.message, 'error');
-  } finally {
-    isLoading = false;
-  }
-}
-
-function leaveChat() {
-  channels.forEach(c => supabase.removeChannel(c));
-  channels = [];
-  if (callManager) { callManager.stop(); callManager = null; }
-  supabase.from('chat_participants').delete().eq('room_id', currentRoom.id).eq('peer_id', me);
-  supabase.from('typing_indicators').delete().eq('room_id', currentRoom.id).eq('peer_id', me);
-  sessionStorage.removeItem('ssha_session');
-  currentRoom = null; displayName = ''; messages = []; participants = [];
-  renderWelcome();
-}
-
-async function initChat() {
-  // Загрузка участников
-  await updateParticipants();
-  // heartbeat
-  const hb = setInterval(async () => {
-    const { data } = await supabase.from('chat_participants').select('id').eq('room_id', currentRoom.id).eq('peer_id', me).maybeSingle();
-    if (data) await supabase.from('chat_participants').update({ last_seen:new Date().toISOString() }).eq('id', data.id);
-    else await supabase.from('chat_participants').insert({ room_id:currentRoom.id, display_name:displayName, peer_id:me });
-  }, 15000);
-  const onUnload = () => {
-    supabase.from('chat_participants').delete().eq('room_id', currentRoom.id).eq('peer_id', me);
-  };
-  window.addEventListener('beforeunload', onUnload);
-
-  // Подписка на новые сообщения
-  const msgCh = supabase.channel(`msg-${currentRoom.id}-${me}`).on('postgres_changes',
-    { event:'INSERT', schema:'public', table:'chat_messages', filter:`room_id=eq.${currentRoom.id}` },
-    (p) => {
-      const m = p.new;
-      if (!messages.find(x=>x.id===m.id)) {
-        messages.push(m);
-        renderMessages();
-        if (document.hidden) playNotificationSound();
-      }
-    }
-  ).subscribe();
-  channels.push(msgCh);
-
-  // Подписка на обновление участников
-  const partCh = supabase.channel(`part-${currentRoom.id}-${me}`)
-    .on('postgres_changes',{ event:'INSERT', schema:'public', table:'chat_participants', filter:`room_id=eq.${currentRoom.id}` }, updateParticipants)
-    .on('postgres_changes',{ event:'DELETE', schema:'public', table:'chat_participants', filter:`room_id=eq.${currentRoom.id}` }, updateParticipants)
-    .on('postgres_changes',{ event:'UPDATE', schema:'public', table:'chat_participants', filter:`room_id=eq.${currentRoom.id}` }, updateParticipants)
-    .subscribe();
-  channels.push(partCh);
-
-  // Подписка на индикацию печатания
-  const typingCh = supabase.channel(`typing-${currentRoom.id}`)
-    .on('postgres_changes', { event:'*', schema:'public', table:'typing_indicators', filter:`room_id=eq.${currentRoom.id}` }, (p) => {
-      const event = p.eventType;
-      const newRow = p.new;
-      if (event === 'INSERT' || event === 'UPDATE') {
-        if (newRow.peer_id !== me) {
-          typingPeers[newRow.peer_id] = newRow.display_name;
-          updateTypingIndicator();
-        }
-      } else if (event === 'DELETE') {
-        const old = p.old;
-        if (old && old.peer_id !== me) {
-          delete typingPeers[old.peer_id];
-          updateTypingIndicator();
-        }
-      }
-    }).subscribe();
-  channels.push(typingCh);
-
-  // Call manager
-  callManager = new CallManager(me, currentRoom.id, {
-    onRemoteStream: (s) => { remoteStream = s; renderCall(); },
-    onLocalStream: (s) => { localStream = s; renderCall(); },
-    onCallEnded: (reason) => { callState='idle'; callPeer=null; localStream=null; remoteStream=null; clearCallTimer(); renderCall(); if(reason) showToast(reason, 'info'); },
-    onStateChange: (st) => { callState = st; if (st==='connected') startCallTimer(); renderCall(); },
   });
-  callManager.start();
-  window.addEventListener('incoming-call', onIncomingCall);
-}
 
-async function updateParticipants() {
-  const { data } = await supabase.from('chat_participants').select('*').eq('room_id', currentRoom.id).order('created_at',{ascending:true});
-  participants = data || [];
-  renderParticipants();
-}
+  let conn = null;
+  let targetPeerId = null;
 
-function updateTypingIndicator() {
-  const el = document.getElementById('typing-indicator');
-  if (!el) return;
-  const names = Object.values(typingPeers);
-  if (names.length === 0) {
-    el.classList.add('hidden');
-    el.textContent = '';
-  } else {
-    el.classList.remove('hidden');
-    el.textContent = names.join(', ') + (names.length === 1 ? ' печатает...' : ' печатают...');
-  }
-}
-
-async function sendText() {
-  const input = document.getElementById('msg-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = ''; input.style.height='auto';
-  document.getElementById('send-btn').disabled = true;
-  await supabase.from('chat_messages').insert({ room_id:currentRoom.id, peer_id:me, display_name:displayName, kind:'text', content:text });
-  // Удалить индикатор печатания
-  supabase.from('typing_indicators').delete().eq('room_id', currentRoom.id).eq('peer_id', me).catch(()=>{});
-}
-
-function renderMessages() {
-  const el = document.getElementById('messages');
-  if (!el) return;
-  if (!messages.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">${IC.send}</div><div class="empty-text">Нет сообщений. Напишите первым!</div><div class="empty-code">Код приглашения: <span>${escapeHtml(currentRoom.invite_code)}</span></div></div>`;
-    return;
-  }
-  let html = '';
-  if (hasMore) {
-    html += `<div class="load-more" id="load-more">Загрузить ещё</div>`;
-  }
-  html += messages.map(msg => {
-    const mine = msg.peer_id === me;
-    const time = fmtTimeStr(msg.created_at);
-    let contentHtml = '';
-    if (msg.kind === 'image') {
-      contentHtml = `<div class="msg-image"><img src="${escapeHtml(msg.content)}" alt="Фото" onclick="window.open('${escapeHtml(msg.content)}','_blank')" onerror="this.parentElement.innerHTML='<div class=\\'img-error\\'>${IC.alert}<span>Не удалось загрузить</span></div>'"></div>`;
-    } else if (msg.kind === 'audio') {
-      contentHtml = `<div class="msg-audio"><audio src="${escapeHtml(msg.content)}" controls></audio></div>`;
+  peer.on('open', (id) => {
+    log(`Мой Peer ID: ${id}`);
+    const remoteId = window.location.hash.substring(1);
+    
+    if (remoteId && remoteId !== id) {
+      targetPeerId = remoteId;
+      log(`Подключение к ID из URL: ${remoteId}...`);
+      setStatus('Подключение...', 'default');
+      connectToPeer(remoteId);
     } else {
-      contentHtml = `<div class="msg-bubble">${escapeHtml(msg.content)}</div>`;
+      log("Ожидание подключения...");
+      setStatus('Готов к подключению', 'default');
     }
-    return `<div class="msg ${mine?'mine':'other'}">
-      <div class="msg-content">
-        ${!mine?`<span class="msg-name">${escapeHtml(msg.display_name)}</span>`:''}
-        ${contentHtml}
-        <span class="msg-time">${time}</span>
-        ${mine ? `<button class="msg-delete" data-id="${msg.id}">${IC.trash}</button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-  el.innerHTML = html;
-  // Кнопка удаления
-  el.querySelectorAll('.msg-delete').forEach(btn => {
-    btn.onclick = async () => {
-      const id = btn.dataset.id;
+  });
+
+  peer.on('error', (err) => {
+    log(`Ошибка PeerJS (${err.type}): ${err.message}`, true);
+    if (err.type === 'peer-unavailable') {
+      setStatus('Собеседник не найден', 'error');
+      appendMessage('Собеседник недоступен. Отправьте новую ссылку.', 'system');
+    }
+  });
+
+  peer.on('connection', (c) => {
+    log(`Входящее подключение от: ${c.peer}`);
+    conn = c;
+    targetPeerId = c.peer; // Фикс: запоминаем ID собеседника для обратного вызова
+    bindConnectionEvents();
+  });
+
+  function connectToPeer(remoteId) {
+    conn = peer.connect(remoteId, { reliable: true });
+    bindConnectionEvents();
+  }
+
+  function bindConnectionEvents() {
+    if (!conn) return;
+
+    conn.on('open', () => {
+      log("Канал связи открыт!");
+      setStatus('В сети', 'online');
+      appendMessage('Соединение установлено!', 'system');
+    });
+
+    conn.on('data', (data) => {
+      log(`Сообщение: "${data}"`);
+      appendMessage(data, 'peer');
+    });
+
+    conn.on('close', () => {
+      log("Соединение закрыто", true);
+      setStatus('Собеседник отключился', 'error');
+      appendMessage('Собеседник вышел из чата', 'system');
+      conn = null;
+    });
+
+    conn.on('error', (err) => {
+      log(`Ошибка канала: ${err}`, true);
+      setStatus('Ошибка подключения', 'error');
+    });
+  }
+
+  peer.on('call', async (call) => {
+    log(`Входящий звонок от: ${call.peer}`);
+    if (confirm("Входящий голосовой вызов! Ответить?")) {
       try {
-        const { error } = await supabase.from('chat_messages').delete().eq('id', id).eq('peer_id', me);
-        if (error) throw error;
-        messages = messages.filter(m => m.id !== id);
-        renderMessages();
-        showToast('Сообщение удалено', 'success');
-      } catch (e) { showToast('Не удалось удалить: ' + e.message, 'error'); }
-    };
-  });
-  // Загрузка ещё
-  const loadMoreBtn = document.getElementById('load-more');
-  if (loadMoreBtn) loadMoreBtn.onclick = () => loadMessages(false);
-  el.scrollTop = el.scrollHeight;
-}
-
-function renderParticipants() {
-  const others = participants.filter(p => p.peer_id !== me);
-  const statusDot = document.getElementById('status-dot');
-  const statusText = document.getElementById('status-text');
-  if (statusDot) { statusDot.className = `status-dot ${others.length>0?'online':'offline'}`; }
-  if (statusText) statusText.textContent = others.length>0 ? `${others.length} в сети` : 'Один в чате';
-  document.getElementById('call-btn').disabled = others.length === 0;
-  document.getElementById('video-btn').disabled = others.length === 0;
-  const list = document.getElementById('sidebar-list');
-  if (list) {
-    list.innerHTML = participants.map(p => {
-      const color = avatarColor(p.peer_id);
-      const grad = color.replace('from-','').replace(' to-','_to_');
-      return `<div class="sidebar-item"><div class="sidebar-avatar" style="background:linear-gradient(135deg,${cssGrad(color)})">${initials(p.display_name)}</div><div class="sidebar-info"><div class="sidebar-name">${escapeHtml(p.display_name)}</div><div class="sidebar-status">${p.peer_id===me?'Вы':'В сети'}</div></div><span class="sidebar-dot"></span></div>`;
-    }).join('');
-  }
-  const count = document.getElementById('sidebar-count');
-  if (count) count.textContent = participants.length;
-}
-
-function cssGrad(tw) {
-  const map = { 'amber-400':'#fbbf24','red-500':'#ef4444','cyan-400':'#22d3ee','blue-500':'#3b82f6','emerald-400':'#34d399','teal-500':'#14b8a6','fuchsia-400':'#e879f9','pink-500':'#ec4899','rose-400':'#fb7185','orange-500':'#f97316','lime-400':'#a3e635','green-500':'#22c55e','sky-400':'#38bdf8','indigo-500':'#6366f1','violet-400':'#a78bfa','purple-500':'#a855f7' };
-  const parts = tw.replace('from-','').replace(' to-',' ').split(' ');
-  return map[parts[0]] + ',' + map[parts[1]];
-}
-
-// ── Emoji (без изменений) ──
-function toggleEmoji() { /* ... код остаётся как в оригинале, но мы его сократим для краткости */ }
-// (опущено для экономии, но в реальном файле будет полный код)
-
-// ── Audio recorder (без изменений) ──
-function renderAudioRecorder() { /* ... */ }
-
-// ── Image upload (без изменений) ──
-async function handleImageUpload(e) { /* ... */ }
-
-// ── Invite modal (без изменений) ──
-function showInvite() { /* ... */ }
-
-// ── Call (без изменений, но с TURN) ──
-function startCall(withVideo) { /* ... */ }
-function acceptCall() { /* ... */ }
-// ... остальные функции звонка
-
-// ── Init ──
-async function init() {
-  // Восстановление сессии Supabase
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    // Пользователь авторизован
-  }
-  // Проверка URL с ?join
-  const params = new URLSearchParams(window.location.search);
-  const joinCode = params.get('join');
-  if (joinCode) {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('join');
-    window.history.replaceState({}, '', url.toString());
-  }
-  // Восстановление сессии чата
-  const sessionChat = sessionStorage.getItem('ssha_session');
-  if (sessionChat) {
-    try {
-      const parsed = JSON.parse(sessionChat);
-      if (parsed.room?.id && parsed.displayName) {
-        currentRoom = parsed.room; displayName = parsed.displayName;
-        renderChat(); initChat();
-        return;
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        call.answer(stream);
+        call.on('stream', (remoteStream) => {
+          document.getElementById('remote-audio').srcObject = remoteStream;
+        });
+      } catch (e) {
+        log(`Ошибка микрофона: ${e.message}`, true);
+        alert("Не удалось получить доступ к микрофону");
       }
-    } catch {}
-  }
-  renderWelcome();
-  if (joinCode) {
-    setTimeout(() => {
-      document.getElementById('tab-join')?.click();
-      const ci = document.getElementById('code-input');
-      if (ci) ci.value = joinCode.toUpperCase();
-    }, 100);
-  }
-}
+    }
+  });
 
-// Глобальный перехват ошибок
-window.onerror = (msg, url, line, col, error) => {
-  showToast('Ошибка: ' + msg, 'error');
-  return true;
-};
-window.addEventListener('unhandledrejection', (e) => {
-  showToast('Ошибка: ' + (e.reason?.message || 'Неизвестная ошибка'), 'error');
-});
+  function copyInviteLink() {
+    if (!peer.id) return alert("Сеть еще не готова!");
+    const baseUrl = window.location.href.split('#')[0];
+    const link = `${baseUrl}#${peer.id}`;
+    
+    navigator.clipboard.writeText(link).then(() => {
+      alert("Ссылка скопирована! Отправьте её собеседнику.");
+    });
+  }
 
-init();
+  function sendMessage() {
+    const input = document.getElementById('message-input');
+    const text = input.value.trim();
+    
+    if (text && conn && conn.open) {
+      conn.send(text);
+      appendMessage(text, 'my');
+      input.value = '';
+    } else if (!conn || !conn.open) {
+      alert("Собеседник не подключен.");
+    }
+  }
+
+  function appendMessage(text, type) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg ${type}`;
+    
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    msgDiv.innerHTML = `<div>${text}</div>${type !== 'system' ? `<div class="msg-time">${timeStr}</div>` : ''}`;
+    
+    const container = document.getElementById('messages');
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function startCall() {
+    if (!targetPeerId) return alert("Нет подключенного собеседника!");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const call = peer.call(targetPeerId, stream);
+      call.on('stream', (remoteStream) => {
+        document.getElementById('remote-audio').srcObject = remoteStream;
+      });
+    } catch (err) {
+      alert("Не удалось получить доступ к микрофону");
+    }
+  }
+
+  function toggleLogs() {
+    const container = document.getElementById('logs-container');
+    container.style.display = container.style.display === 'flex' ? 'none' : 'flex';
+  }
+
+  function toggleEmoji() {
+    const picker = document.getElementById('emoji-picker');
+    picker.style.display = picker.style.display === 'flex' ? 'none' : 'flex';
+  }
+
+  function addEmoji(emoji) {
+    const input = document.getElementById('message-input');
+    input.value += emoji;
+    toggleEmoji();
+    input.focus();
+  }
 </script>
+
 </body>
 </html>
