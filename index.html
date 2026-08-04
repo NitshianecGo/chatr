@@ -6,7 +6,6 @@
     <title>Домашний Чат</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
-        /* (стили без изменений, такие же как в предыдущей версии) */
         * { margin:0; padding:0; box-sizing:border-box; }
         :root {
             --bg: #2c1810;
@@ -21,57 +20,208 @@
         }
         html, body { height:100%; background: var(--bg); color: var(--text); font-family: var(--font-main); margin:0; padding:0; }
         body { display:flex; align-items:center; justify-content:center; padding:16px; position:relative; }
-        body::before { content:''; position:fixed; inset:0; background: repeating-linear-gradient(45deg, rgba(60,35,25,0.3) 0px, rgba(60,35,25,0.3) 2px, rgba(90,55,40,0.2) 2px, rgba(90,55,40,0.2) 8px), radial-gradient(circle at 20% 30%, #4a2e1e, #1e110a); z-index:-2; }
-        body::after { content:''; position:fixed; inset:0; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" opacity="0.15"><path d="M100 10 L110 60 L160 70 L120 100 L130 150 L100 120 L70 150 L80 100 L40 70 L90 60 Z" fill="%23b5835a"/></svg>') repeat; background-size:120px 120px; z-index:-1; pointer-events:none; animation:fall 60s linear infinite; }
-        @keyframes fall { 0%{background-position:0 0} 100%{background-position:200px 200px} }
-        .card { background:var(--surface); backdrop-filter:blur(12px); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; width:100%; max-width:480px; transition:all 0.3s; position:relative; z-index:1; }
-        h1, h2 { font-family:var(--font-head); font-weight:700; color:var(--accent); text-shadow:0 2px 8px rgba(0,0,0,0.5); }
-        button { font-family:var(--font-main); border:none; background:linear-gradient(145deg, #b5835a, #8b6b4b); color:#2c1810; font-weight:500; padding:10px 20px; border-radius:30px; cursor:pointer; transition:transform 0.15s, box-shadow 0.15s; box-shadow:0 4px 12px rgba(0,0,0,0.3); font-size:14px; }
-        button:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.5); }
-        button:active { transform:scale(0.97); }
-        input, textarea { font-family:var(--font-main); background:rgba(30,17,10,0.7); border:1px solid var(--border); border-radius:30px; padding:10px 16px; color:var(--text); width:100%; outline:none; transition:border 0.2s; }
-        input:focus, textarea:focus { border-color:var(--accent); }
-        .hidden { display:none !important; }
-        .fade-in { animation:fadeIn 0.4s ease; }
-        @keyframes fadeIn { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
-        .pulse { animation:pulse 1.5s infinite; }
-        @keyframes pulse { 0%{opacity:0.8} 50%{opacity:1} 100%{opacity:0.8} }
-        #splash { position:fixed; inset:0; background:#2c1810; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:1000; transition:opacity 1s; }
+        body::before {
+            content: '';
+            position: fixed; inset:0;
+            background: repeating-linear-gradient(45deg, rgba(60,35,25,0.3) 0px, rgba(60,35,25,0.3) 2px, rgba(90,55,40,0.2) 2px, rgba(90,55,40,0.2) 8px), radial-gradient(circle at 20% 30%, #4a2e1e, #1e110a);
+            z-index:-2;
+        }
+        body::after {
+            content: '';
+            position: fixed; inset:0;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" opacity="0.15"><path d="M100 10 L110 60 L160 70 L120 100 L130 150 L100 120 L70 150 L80 100 L40 70 L90 60 Z" fill="%23b5835a"/></svg>') repeat;
+            background-size: 120px 120px;
+            z-index:-1;
+            pointer-events:none;
+            animation: fall 60s linear infinite;
+        }
+        @keyframes fall { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; } }
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            width: 100%;
+            max-width: 480px;
+            transition: all 0.3s;
+            position: relative;
+            z-index:1;
+        }
+        h1, h2 { font-family: var(--font-head); font-weight: 700; color: var(--accent); text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+        button {
+            font-family: var(--font-main);
+            border: none;
+            background: linear-gradient(145deg, #b5835a, #8b6b4b);
+            color: #2c1810;
+            font-weight: 500;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-size: 14px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+        button:active { transform: scale(0.97); }
+        input, textarea {
+            font-family: var(--font-main);
+            background: rgba(30, 17, 10, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 10px 16px;
+            color: var(--text);
+            width: 100%;
+            outline: none;
+            transition: border 0.2s;
+        }
+        input:focus, textarea:focus { border-color: var(--accent); }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .pulse { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity:0.8; } 50% { opacity:1; } 100% { opacity:0.8; } }
+
+        #splash {
+            position: fixed;
+            inset:0;
+            background: #2c1810;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            z-index:1000;
+            transition: opacity 1s;
+        }
         #splash.hidden { opacity:0; pointer-events:none; }
         #splash .logo-svg { width:120px; height:120px; margin-bottom:20px; animation:float 3s ease-in-out infinite; }
         @keyframes float { 0%{transform:translateY(0)} 50%{transform:translateY(-15px)} 100%{transform:translateY(0)} }
         #splash h1 { font-family:var(--font-head); font-size:42px; color:var(--accent); text-shadow:0 0 30px rgba(212,163,115,0.3); }
         #splash p { color:var(--border); margin-top:12px; letter-spacing:4px; }
-        .user-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(80px,1fr)); gap:12px; margin:16px 0; }
-        .user-btn { background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; padding:12px 4px; text-align:center; cursor:pointer; transition:all 0.2s; color:var(--text); }
-        .user-btn:hover { background:rgba(255,255,255,0.15); border-color:var(--accent); }
+
+        .user-grid {
+            display:grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap:12px;
+            margin:16px 0;
+        }
+        .user-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius:12px;
+            padding:12px 4px;
+            text-align:center;
+            cursor:pointer;
+            transition: all 0.2s;
+            color:var(--text);
+        }
+        .user-btn:hover { background: rgba(255,255,255,0.15); border-color:var(--accent); }
         .user-btn .avatar { font-size:32px; display:block; }
         .user-btn .uname { font-size:13px; margin-top:4px; }
         .user-btn.occupied { opacity:0.4; cursor:not-allowed; pointer-events:none; }
         .user-btn.active { border-color:var(--accent); background:rgba(212,163,115,0.2); }
-        .room-item { background:rgba(255,255,255,0.05); border-radius:12px; padding:12px 16px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid var(--accent); transition:background 0.2s; cursor:pointer; }
+
+        .room-item {
+            background: rgba(255,255,255,0.05);
+            border-radius:12px;
+            padding:12px 16px;
+            margin-bottom:8px;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            border-left:3px solid var(--accent);
+            transition:background 0.2s;
+            cursor:pointer;
+        }
         .room-item:hover { background:rgba(255,255,255,0.1); }
         .room-item .name { font-weight:500; }
         .room-item .last-msg { font-size:12px; color:var(--border); }
-        #chat-window { display:flex; flex-direction:column; height:100%; max-height:600px; }
-        #chat-header { display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:1px solid var(--border); }
+
+        #chat-window {
+            display:flex;
+            flex-direction:column;
+            height:100%;
+            max-height:600px;
+        }
+        #chat-header {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding-bottom:12px;
+            border-bottom:1px solid var(--border);
+        }
         #chat-header .partner { font-weight:700; font-size:18px; }
         #chat-header .back-btn { background:none; box-shadow:none; padding:8px; font-size:20px; }
-        #messages-container { flex:1; overflow-y:auto; padding:12px 0; display:flex; flex-direction:column; gap:8px; max-height:400px; }
-        .msg { max-width:80%; padding:8px 14px; border-radius:18px; animation:fadeIn 0.2s ease; word-wrap:break-word; }
+        #messages-container {
+            flex:1;
+            overflow-y:auto;
+            padding:12px 0;
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+            max-height:400px;
+        }
+        .msg {
+            max-width:80%;
+            padding:8px 14px;
+            border-radius:18px;
+            animation:fadeIn 0.2s ease;
+            word-wrap:break-word;
+        }
         .msg.mine { align-self:flex-end; background:var(--accent); color:#1e110a; border-bottom-right-radius:4px; }
         .msg.other { align-self:flex-start; background:rgba(255,255,255,0.08); border-bottom-left-radius:4px; }
         .msg .time { font-size:10px; opacity:0.7; margin-left:8px; }
         .msg .name { font-weight:500; font-size:12px; display:block; }
         .msg img, .msg video { max-width:200px; max-height:200px; border-radius:12px; margin-top:4px; }
         .msg .audio-player audio { width:150px; height:32px; filter:invert(1); }
-        #composer { display:flex; gap:8px; align-items:center; padding-top:12px; border-top:1px solid var(--border); }
-        #composer textarea { flex:1; resize:none; border-radius:30px; padding:8px 16px; height:44px; max-height:100px; }
-        #composer button { padding:8px 12px; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+
+        #composer {
+            display:flex;
+            gap:8px;
+            align-items:center;
+            padding-top:12px;
+            border-top:1px solid var(--border);
+        }
+        #composer textarea {
+            flex:1;
+            resize:none;
+            border-radius:30px;
+            padding:8px 16px;
+            height:44px;
+            max-height:100px;
+        }
+        #composer button {
+            padding:8px 12px;
+            border-radius:50%;
+            width:44px;
+            height:44px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:18px;
+        }
         .recording-indicator { color:#e74c3c; font-weight:bold; display:flex; align-items:center; gap:4px; }
         .recording-indicator .dot { width:10px; height:10px; border-radius:50%; background:#e74c3c; animation:pulse 1s infinite; }
-        #call-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; z-index:100; }
-        #call-overlay .call-card { background:var(--surface); padding:32px; border-radius:var(--radius); text-align:center; max-width:320px; width:100%; }
+
+        #call-overlay {
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,0.7);
+            backdrop-filter:blur(6px);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            z-index:100;
+        }
+        #call-overlay .call-card {
+            background:var(--surface);
+            padding:32px;
+            border-radius:var(--radius);
+            text-align:center;
+            max-width:320px;
+            width:100%;
+        }
         #call-overlay .call-card .avatar { font-size:64px; margin-bottom:8px; }
         #call-overlay .call-card .status { font-size:18px; margin-bottom:16px; }
         .call-btn { padding:12px 24px; border-radius:40px; font-size:16px; }
@@ -82,7 +232,12 @@
         .participant-selector .sel-btn { background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:30px; padding:6px 14px; font-size:13px; cursor:pointer; transition:all 0.2s; }
         .participant-selector .sel-btn:hover { background:rgba(255,255,255,0.15); }
         .participant-selector .sel-btn.selected { background:var(--accent); color:#2c1810; border-color:var(--accent); }
-        @media (max-width:480px) { .card { padding:16px; } #chat-window { max-height:80vh; } .user-grid { grid-template-columns:repeat(auto-fill, minmax(60px,1fr)); } }
+
+        @media (max-width:480px) {
+            .card { padding:16px; }
+            #chat-window { max-height:80vh; }
+            .user-grid { grid-template-columns: repeat(auto-fill, minmax(60px,1fr)); }
+        }
     </style>
 </head>
 <body>
@@ -143,7 +298,7 @@
         const USER_IDS = ['user1', 'user2', 'user3', 'user4', 'user5'];
 
         // ─── Состояние ──────────────────────────────────────────────
-        let currentUser = null;          // { id, display_name }
+        let currentUser = null;
         let currentRoom = null;
         let messages = [];
         let callManager = null;
@@ -153,40 +308,44 @@
         let isRecording = false;
         let recordingTimer = null;
         let recordingStart = 0;
-        let activeUsers = {};            // id -> display_name
+        let activeUsers = {};
 
         const app = document.getElementById('app');
+        const splash = document.getElementById('splash');
 
-        // ─── Инициализация: загружаем пользователей из БД ──────────
+        // ─── Инициализация: загрузка пользователей ──────────────
         async function initUsers() {
-            // Проверяем, есть ли таблица users; если нет, создаём
-            // Для простоты создадим её вручную или через SQL (инструкция ниже)
-            // Загружаем всех пользователей
-            const { data, error } = await supabase
-                .from('users')
-                .select('*');
-            if (error) {
-                console.warn('Ошибка загрузки users, возможно таблица не создана:', error);
-                // Если таблицы нет, создадим фейковые данные для отображения
-                // Но лучше создать таблицу заранее
-                alert('Таблица users не найдена. Выполните SQL-скрипт из инструкции.');
-                return;
-            }
-            // Если пользователей нет, создаём записи для user1..user5
-            if (data.length === 0) {
-                for (const id of USER_IDS) {
-                    await supabase.from('users').insert([{ id, display_name: generateAnimalName(), is_active: false }]);
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*');
+                if (error) throw error;
+                if (data.length === 0) {
+                    for (const id of USER_IDS) {
+                        await supabase.from('users').insert([{ id, display_name: generateAnimalName(), is_active: false }]);
+                    }
+                    const { data: newData } = await supabase.from('users').select('*');
+                    if (newData) {
+                        newData.forEach(u => { activeUsers[u.id] = u; });
+                    }
+                } else {
+                    data.forEach(u => { activeUsers[u.id] = u; });
                 }
-                // Перезагружаем
-                const { data: newData } = await supabase.from('users').select('*');
-                if (newData) {
-                    // обновим activeUsers
-                    newData.forEach(u => { activeUsers[u.id] = u; });
+                renderUserSelect();
+            } catch (e) {
+                console.warn('Ошибка загрузки users, используем локальные имена:', e);
+                const stored = localStorage.getItem('chat_users');
+                if (stored) {
+                    activeUsers = JSON.parse(stored);
+                } else {
+                    activeUsers = {};
+                    for (const id of USER_IDS) {
+                        activeUsers[id] = { id, display_name: generateAnimalName(), is_active: false };
+                    }
+                    localStorage.setItem('chat_users', JSON.stringify(activeUsers));
                 }
-            } else {
-                data.forEach(u => { activeUsers[u.id] = u; });
+                renderUserSelect();
             }
-            renderUserSelect();
         }
 
         // ─── Рендер выбора пользователя ────────────────────────────
@@ -225,19 +384,22 @@
         // ─── Вход пользователя ──────────────────────────────────────
         async function loginUser(id) {
             try {
-                // Генерируем новое имя
                 const newName = generateAnimalName();
-                // Обновляем в БД
-                const { error } = await supabase
-                    .from('users')
-                    .update({ display_name: newName, is_active: true })
-                    .eq('id', id);
-                if (error) throw error;
-                // Обновляем локальное состояние
+                try {
+                    await supabase
+                        .from('users')
+                        .update({ display_name: newName, is_active: true })
+                        .eq('id', id);
+                } catch (e) {
+                    activeUsers[id].display_name = newName;
+                    activeUsers[id].is_active = true;
+                    localStorage.setItem('chat_users', JSON.stringify(activeUsers));
+                }
                 currentUser = { id, display_name: newName };
-                activeUsers[id].display_name = newName;
-                activeUsers[id].is_active = true;
-                // Загружаем комнаты
+                if (activeUsers[id]) {
+                    activeUsers[id].display_name = newName;
+                    activeUsers[id].is_active = true;
+                }
                 await loadRooms();
             } catch (e) {
                 alert('Ошибка входа: ' + e.message);
@@ -306,30 +468,22 @@
         // ─── Выход ──────────────────────────────────────────────────
         async function logoutUser() {
             try {
-                await supabase
-                    .from('users')
-                    .update({ is_active: false })
-                    .eq('id', currentUser.id);
-                currentUser = null;
-                // Перезагружаем пользователей
-                const { data } = await supabase.from('users').select('*');
-                activeUsers = {};
-                data.forEach(u => { activeUsers[u.id] = u; });
-                renderUserSelect();
-            } catch (e) {
-                alert('Ошибка выхода: ' + e.message);
-            }
+                await supabase.from('users').update({ is_active: false }).eq('id', currentUser.id);
+            } catch (e) {}
+            currentUser = null;
+            const { data } = await supabase.from('users').select('*');
+            activeUsers = {};
+            data.forEach(u => { activeUsers[u.id] = u; });
+            renderUserSelect();
         }
 
-        // ─── Диалог создания комнаты (с выбором участников) ──────
+        // ─── Диалог создания комнаты ──────────────────────────────
         async function showCreateRoomDialog() {
-            // Получаем список активных пользователей (кроме текущего)
             const activeList = Object.values(activeUsers).filter(u => u.is_active && u.id !== currentUser.id);
             if (activeList.length === 0) {
                 alert('Нет доступных пользователей для добавления.');
                 return;
             }
-            // Создаём модальное окно с выбором
             const overlay = document.createElement('div');
             overlay.id = 'call-overlay';
             overlay.innerHTML = `
@@ -712,7 +866,7 @@
             }
         }
 
-        // ─── Класс CallManager (исправленный, с буферизацией ICE) ──
+        // ─── Класс CallManager (групповые звонки с буферизацией ICE) ──
         class CallManager {
             constructor(room, myId) {
                 this.room = room;
@@ -995,22 +1149,21 @@
         }
 
         // ─── Запуск приложения ──────────────────────────────────────
-        // Скрываем сплеш через 1.5 сек
         setTimeout(() => {
-            document.getElementById('splash').classList.add('hidden');
+            splash.classList.add('hidden');
         }, 1500);
 
-        // Инициализация
         await initUsers();
 
         console.log('✅ Домашний Чат запущен.');
         console.log('👤 Пользователи:', Object.values(activeUsers).map(u => `${u.id} (${u.display_name})`).join(', '));
         console.log('📌 Нажмите на свой профиль для входа.');
 
-        // При закрытии вкладки – выходим
         window.addEventListener('beforeunload', async () => {
             if (currentUser) {
-                await supabase.from('users').update({ is_active: false }).eq('id', currentUser.id);
+                try {
+                    await supabase.from('users').update({ is_active: false }).eq('id', currentUser.id);
+                } catch (e) {}
             }
         });
     </script>
