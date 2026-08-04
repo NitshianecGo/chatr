@@ -12,13 +12,14 @@ import { getStorage } from 'firebase/storage'
 //  Storage Rules, которые вы настроите отдельно.
 // ─────────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: 'ВСТАВЬТЕ_apiKey',
-  authDomain: 'ВСТАВЬТЕ_authDomain',
-  projectId: 'ВСТАВЬТЕ_projectId',
-  storageBucket: 'ВСТАВЬТЕ_storageBucket',
-  messagingSenderId: 'ВСТАВЬТЕ_messagingSenderId',
-  appId: 'ВСТАВЬТЕ_appId',
-}
+  apiKey: "AIzaSyDYrL9ecKeoeIku5E1Zwyz9uvFlwcviwNk",
+  authDomain: "aurora-chat-362a8.firebaseapp.com",
+  projectId: "aurora-chat-362a8",
+  storageBucket: "aurora-chat-362a8.firebasestorage.app",
+  messagingSenderId: "134500363035",
+  appId: "1:134500363035:web:ad81961997929f105001be",
+  measurementId: "G-DHK55W5EFZ"
+};
 
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
