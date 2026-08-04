@@ -6,7 +6,7 @@
     <title>Домашний Чат</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
-        /* все стили без изменений – как в предыдущей версии */
+        /* (все стили без изменений, те же, что были в предыдущем ответе) */
         * { margin:0; padding:0; box-sizing:border-box; }
         :root {
             --bg: #2c1810;
@@ -232,7 +232,7 @@
 
     <script type="module">
         // ------------------------------------------------------------
-        // 1. Звуки
+        // 1. Звуки (без изменений)
         // ------------------------------------------------------------
         function playBeep(freq=800, dur=200) {
             try {
@@ -254,7 +254,7 @@
         function playCallConnected() { playBeep(1200, 100); setTimeout(()=>playBeep(1500, 100), 200); }
 
         // ------------------------------------------------------------
-        // 2. Supabase
+        // 2. Supabase (или заглушка)
         // ------------------------------------------------------------
         const SUPABASE_URL = 'https://uqtiieyrjzcqulpojlfd.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S';
@@ -277,7 +277,7 @@
         }
 
         // ------------------------------------------------------------
-        // 4. localStorage (защищённый)
+        // 4. Защищённый localStorage
         // ------------------------------------------------------------
         function saveLocalData(key, data) {
             try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
@@ -621,7 +621,7 @@
         }
 
         // ------------------------------------------------------------
-        // 8. Остальные функции (рендер экранов, комнаты, сообщения)
+        // 8. Экран выбора пользователя
         // ------------------------------------------------------------
         function renderUserSelect() {
             const users = Object.values(activeUsers);
@@ -647,6 +647,9 @@
             });
         }
 
+        // ------------------------------------------------------------
+        // 9. Вход/выход и heartbeat
+        // ------------------------------------------------------------
         async function loginUser(id) {
             try {
                 const newName = generateAnimalName();
@@ -657,14 +660,15 @@
                             is_active: true,
                             last_seen: new Date().toISOString()
                         }).eq('id', id);
-                    } catch (e) {}
+                    } catch (e) {
+                        console.warn('Ошибка обновления в Supabase (возможно, нет колонки last_seen)', e);
+                    }
                 }
                 activeUsers[id].display_name = newName;
                 activeUsers[id].is_active = true;
                 activeUsers[id].last_seen = Date.now();
                 saveLocalData('chat_users', activeUsers);
                 currentUser = { id, display_name: newName };
-                // Запускаем heartbeat
                 startHeartbeat();
                 await loadRooms();
             } catch (e) {
@@ -686,7 +690,6 @@
             renderUserSelect();
         }
 
-        // Heartbeat – обновляем last_seen каждые 10 секунд
         function startHeartbeat() {
             if (heartbeatInterval) clearInterval(heartbeatInterval);
             heartbeatInterval = setInterval(async () => {
@@ -697,9 +700,10 @@
                         await supabase.from('users').update({ last_seen: now }).eq('id', currentUser.id);
                     }
                     activeUsers[currentUser.id].last_seen = Date.now();
-                    // Обновляем статусы других пользователей (проверяем, кто давно не обновлялся)
                     await refreshUsersStatus();
-                } catch (e) {}
+                } catch (e) {
+                    // Игнорируем ошибки (например, если колонки last_seen нет)
+                }
             }, 10000);
         }
 
@@ -711,14 +715,15 @@
         }
 
         async function refreshUsersStatus() {
-            // Считаем неактивными тех, у кого last_seen старше 30 секунд
             const now = Date.now();
-            const timeout = 30000; // 30 сек
+            const timeout = 30000;
+            let changed = false;
             for (const id in activeUsers) {
                 const user = activeUsers[id];
                 if (user.last_seen && (now - user.last_seen) > timeout) {
                     if (user.is_active) {
                         user.is_active = false;
+                        changed = true;
                         if (supabase) {
                             try {
                                 await supabase.from('users').update({ is_active: false }).eq('id', id);
@@ -727,14 +732,15 @@
                     }
                 }
             }
-            saveLocalData('chat_users', activeUsers);
-            // Перерисовываем экран выбора, если мы на нём
-            const userSelect = document.getElementById('user-select');
-            if (userSelect) renderUserSelect();
+            if (changed) {
+                saveLocalData('chat_users', activeUsers);
+                const userSelect = document.getElementById('user-select');
+                if (userSelect) renderUserSelect();
+            }
         }
 
         // ------------------------------------------------------------
-        // 9. Комнаты
+        // 10. Комнаты
         // ------------------------------------------------------------
         async function loadRooms() {
             try {
@@ -799,7 +805,7 @@
         }
 
         // ------------------------------------------------------------
-        // 10. Создание комнаты
+        // 11. Создание комнаты
         // ------------------------------------------------------------
         async function showCreateRoomDialog() {
             const available = Object.values(activeUsers).filter(u => u.id !== currentUser.id);
@@ -881,7 +887,7 @@
         }
 
         // ------------------------------------------------------------
-        // 11. Вход в комнату
+        // 12. Вход в комнату
         // ------------------------------------------------------------
         async function enterRoom(room) {
             currentRoom = room;
@@ -924,7 +930,7 @@
         }
 
         // ------------------------------------------------------------
-        // 12. Окно чата
+        // 13. Окно чата
         // ------------------------------------------------------------
         function renderChatWindow(room) {
             const participantsList = room.participants.map(id => {
@@ -983,7 +989,7 @@
         }
 
         // ------------------------------------------------------------
-        // 13. Приглашение в комнату
+        // 14. Приглашение в комнату
         // ------------------------------------------------------------
         async function inviteUserToRoom() {
             const currentParticipants = currentRoom.participants;
@@ -1044,7 +1050,7 @@
         }
 
         // ------------------------------------------------------------
-        // 14. Отправка сообщений
+        // 15. Отправка сообщений (текст, фото, видео, аудио)
         // ------------------------------------------------------------
         async function sendMessage() {
             const input = document.getElementById('msg-input');
@@ -1150,7 +1156,7 @@
         }
 
         // ------------------------------------------------------------
-        // 15. Аудиозапись
+        // 16. Аудиозапись
         // ------------------------------------------------------------
         async function toggleRecording() {
             if (isRecording) {
@@ -1229,7 +1235,7 @@
         }
 
         // ------------------------------------------------------------
-        // 16. Управление участниками (админ) – исключение
+        // 17. Управление участниками (админ) – исключение
         // ------------------------------------------------------------
         async function manageUsers() {
             const participants = currentRoom.participants;
@@ -1268,7 +1274,7 @@
         }
 
         // ------------------------------------------------------------
-        // 17. Инициализация пользователей
+        // 18. Инициализация пользователей
         // ------------------------------------------------------------
         async function initUsers() {
             let localUsers = loadLocalData('chat_users', null);
@@ -1285,14 +1291,12 @@
                 try {
                     const { data, error } = await supabase.from('users').select('*');
                     if (!error && data.length > 0) {
-                        // Обновляем локальные данные из БД
                         data.forEach(u => {
                             if (activeUsers[u.id]) {
                                 activeUsers[u.id].display_name = u.display_name;
-                                // Проверяем активность по last_seen
                                 const lastSeen = u.last_seen ? new Date(u.last_seen).getTime() : 0;
                                 const now = Date.now();
-                                activeUsers[u.id].is_active = (now - lastSeen) < 30000; // 30 сек
+                                activeUsers[u.id].is_active = (now - lastSeen) < 30000;
                                 activeUsers[u.id].last_seen = lastSeen;
                             }
                         });
@@ -1306,7 +1310,7 @@
         }
 
         // ------------------------------------------------------------
-        // 18. Запуск
+        // 19. Запуск
         // ------------------------------------------------------------
         try {
             await initUsers();
