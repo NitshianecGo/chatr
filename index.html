@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Русский Чат</title>
+    <title>Домашний Чат</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -18,8 +18,8 @@
             --font-main: 'Roboto', sans-serif;
             --font-head: 'Playfair Display', serif;
         }
-        html, body { height:100%; background: var(--bg); color: var(--text); font-family: var(--font-main); }
-        body { display:flex; align-items:center; justify-content:center; padding:16px; }
+        html, body { height:100%; background: var(--bg); color: var(--text); font-family: var(--font-main); margin:0; padding:0; }
+        body { display:flex; align-items:center; justify-content:center; padding:16px; position:relative; }
         body::before {
             content: '';
             position: fixed; inset:0;
@@ -46,6 +46,8 @@
             width: 100%;
             max-width: 480px;
             transition: all 0.3s;
+            position: relative;
+            z-index:1;
         }
         h1, h2 { font-family: var(--font-head); font-weight: 700; color: var(--accent); text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
         button {
@@ -81,15 +83,49 @@
         .pulse { animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity:0.8; } 50% { opacity:1; } 100% { opacity:0.8; } }
 
-        #login-screen .logo { text-align:center; margin-bottom:24px; }
-        #login-screen .logo svg { width:80px; height:80px; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
-        #login-screen .logo h1 { font-size:32px; letter-spacing:2px; }
-        #login-screen .logo p { color:var(--border); font-style:italic; font-size:14px; }
-        .login-field { margin-bottom:16px; }
-        .login-field label { display:block; font-size:12px; color:var(--border); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px; }
-        .login-error { color:#e74c3c; font-size:13px; margin-top:8px; }
+        /* Экран загрузки */
+        #splash {
+            position: fixed;
+            inset:0;
+            background: #2c1810;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            z-index:1000;
+            transition: opacity 1s;
+        }
+        #splash.hidden { opacity:0; pointer-events:none; }
+        #splash .logo-svg { width:120px; height:120px; margin-bottom:20px; animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0%{transform:translateY(0)} 50%{transform:translateY(-15px)} 100%{transform:translateY(0)} }
+        #splash h1 { font-family: var(--font-head); font-size:42px; color:var(--accent); text-shadow:0 0 30px rgba(212,163,115,0.3); }
+        #splash p { color:var(--border); margin-top:12px; letter-spacing:4px; }
 
-        #chat-list .room-item {
+        /* Выбор пользователя (вход) */
+        .user-grid {
+            display:grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap:12px;
+            margin:16px 0;
+        }
+        .user-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius:12px;
+            padding:12px 4px;
+            text-align:center;
+            cursor:pointer;
+            transition: all 0.2s;
+            color:var(--text);
+        }
+        .user-btn:hover { background: rgba(255,255,255,0.15); border-color:var(--accent); }
+        .user-btn .avatar { font-size:32px; display:block; }
+        .user-btn .uname { font-size:13px; margin-top:4px; }
+        .user-btn.occupied { opacity:0.4; cursor:not-allowed; pointer-events:none; }
+        .user-btn.active { border-color:var(--accent); background:rgba(212,163,115,0.2); }
+
+        /* Список комнат */
+        .room-item {
             background: rgba(255,255,255,0.05);
             border-radius:12px;
             padding:12px 16px;
@@ -101,9 +137,9 @@
             transition:background 0.2s;
             cursor:pointer;
         }
-        #chat-list .room-item:hover { background:rgba(255,255,255,0.1); }
-        #chat-list .room-item .name { font-weight:500; }
-        #chat-list .room-item .last-msg { font-size:12px; color:var(--border); }
+        .room-item:hover { background:rgba(255,255,255,0.1); }
+        .room-item .name { font-weight:500; }
+        .room-item .last-msg { font-size:12px; color:var(--border); }
 
         #chat-window {
             display:flex;
@@ -194,14 +230,28 @@
         .call-btn { padding:12px 24px; border-radius:40px; font-size:16px; }
         .call-btn.end { background:#e74c3c; color:white; }
         .call-btn.accept { background:#27ae60; color:white; }
+        .admin-badge { background:var(--accent); color:#2c1810; padding:2px 8px; border-radius:12px; font-size:10px; margin-left:8px; }
 
         @media (max-width:480px) {
             .card { padding:16px; }
             #chat-window { max-height:80vh; }
+            .user-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
         }
     </style>
 </head>
 <body>
+
+    <!-- Экран загрузки (сплеш) -->
+    <div id="splash">
+        <svg class="logo-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="45" stroke="#b5835a" stroke-width="2"/>
+            <path d="M50 10 L60 40 L90 40 L65 60 L75 90 L50 70 L25 90 L35 60 L10 40 L40 40 Z" fill="#d4a373"/>
+            <circle cx="50" cy="50" r="8" fill="#2c1810"/>
+        </svg>
+        <h1>Домашний Чат</h1>
+        <p>❄️ Уютная связь ❄️</p>
+    </div>
+
     <div id="app" class="card fade-in"></div>
 
     <script type="module">
@@ -234,18 +284,18 @@
             auth: { persistSession: false }
         });
 
-        // ─── Пользователи ────────────────────────────────────────────
-        const USERS = {
-            'ivan': { password: '123', name: 'Иван' },
-            'petr': { password: '123', name: 'Пётр' },
-            'elena': { password: '123', name: 'Елена' },
-            'olga': { password: '123', name: 'Ольга' },
-            'sergey': { password: '123', name: 'Сергей' }
-        };
+        // ─── Предустановленные пользователи (5 штук) ──────────────
+        const USERS = [
+            { id: 'user1', name: 'Пользователь 1', password: 'a1b2c3d4' },
+            { id: 'user2', name: 'Пользователь 2', password: 'e5f6g7h8' },
+            { id: 'user3', name: 'Пользователь 3', password: 'i9j0k1l2' },
+            { id: 'user4', name: 'Пользователь 4', password: 'm3n4o5p6' },
+            { id: 'user5', name: 'Пользователь 5', password: 'q7r8s9t0' }
+        ];
 
         // ─── Состояние ──────────────────────────────────────────────
-        let currentUser = null;
-        let currentRoom = null;
+        let currentUser = null;          // { id, name }
+        let currentRoom = null;          // { id, name, admin_id, participants: [...] }
         let messages = [];
         let callManager = null;
         let messagesSubscription = null;
@@ -257,96 +307,98 @@
 
         const app = document.getElementById('app');
 
-        // ─── Рендеры ──────────────────────────────────────────────────
-        function renderLogin() {
+        // ─── Вспомогательные ─────────────────────────────────────────
+        function getOtherUsers(exceptId) {
+            return USERS.filter(u => u.id !== exceptId);
+        }
+
+        // ─── Экран загрузки (сплеш) ────────────────────────────────
+        setTimeout(() => {
+            document.getElementById('splash').classList.add('hidden');
+        }, 1500);
+
+        // ─── Рендер выбора пользователя ────────────────────────────
+        function renderUserSelect() {
             app.innerHTML = `
-                <div id="login-screen" class="fade-in">
-                    <div class="logo">
-                        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="50" cy="50" r="45" stroke="#b5835a" stroke-width="2"/>
-                            <path d="M50 10 L60 40 L90 40 L65 60 L75 90 L50 70 L25 90 L35 60 L10 40 L40 40 Z" fill="#d4a373"/>
-                            <circle cx="50" cy="50" r="8" fill="#2c1810"/>
-                        </svg>
-                        <h1>Русский Чат</h1>
-                        <p>Древняя связь</p>
+                <div id="user-select" class="fade-in">
+                    <div style="text-align:center; margin-bottom:20px;">
+                        <h2>🏠 Кто вы?</h2>
+                        <p style="color:var(--border); font-size:14px;">Выберите свой профиль</p>
                     </div>
-                    <div class="login-field">
-                        <label>Логин</label>
-                        <input id="login-input" placeholder="ivan, petr, elena, olga, sergey">
+                    <div class="user-grid">
+                        ${USERS.map(u => `
+                            <button class="user-btn" data-id="${u.id}">
+                                <span class="avatar">${getAvatar(u.id)}</span>
+                                <span class="uname">${u.name}</span>
+                            </button>
+                        `).join('')}
                     </div>
-                    <div class="login-field">
-                        <label>Пароль</label>
-                        <input id="password-input" type="password" placeholder="123">
-                    </div>
-                    <button id="login-btn" style="width:100%;">Войти в чат</button>
-                    <div id="login-error" class="login-error hidden"></div>
+                    <div id="user-select-error" class="hidden" style="color:#e74c3c; text-align:center; margin-top:8px;"></div>
                 </div>
             `;
-            document.getElementById('login-btn').onclick = doLogin;
-            document.getElementById('login-input').onkeydown = (e) => { if (e.key==='Enter') doLogin(); };
-            document.getElementById('password-input').onkeydown = (e) => { if (e.key==='Enter') doLogin(); };
+            document.querySelectorAll('.user-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const id = btn.dataset.id;
+                    const user = USERS.find(u => u.id === id);
+                    if (user) {
+                        // Автоматический вход (пароль встроен)
+                        currentUser = { id: user.id, name: user.name };
+                        loadRooms();
+                    }
+                };
+            });
         }
 
-        async function doLogin() {
-            const login = document.getElementById('login-input').value.trim().toLowerCase();
-            const password = document.getElementById('password-input').value.trim();
-            const err = document.getElementById('login-error');
-            if (!login || !password) {
-                err.textContent = 'Заполните все поля';
-                err.classList.remove('hidden');
-                return;
-            }
-            const user = USERS[login];
-            if (!user || user.password !== password) {
-                err.textContent = 'Неверный логин или пароль';
-                err.classList.remove('hidden');
-                return;
-            }
-            err.classList.add('hidden');
-            currentUser = { login, name: user.name };
-            await loadRooms();
+        function getAvatar(id) {
+            const map = { 'user1':'👤', 'user2':'🧑', 'user3':'👨', 'user4':'👩', 'user5':'🧔' };
+            return map[id] || '👤';
         }
 
+        // ─── Загрузка комнат пользователя ──────────────────────────
         async function loadRooms() {
             try {
+                // Получаем все комнаты, где есть текущий пользователь
                 const { data, error } = await supabase
                     .from('rooms')
                     .select('*')
-                    .contains('participants', [currentUser.login]);
-                if (error) {
-                    console.error('Ошибка загрузки комнат:', error);
-                    alert('Ошибка загрузки комнат: ' + error.message);
-                    return;
-                }
-                renderChatList(data || []);
+                    .contains('participants', [currentUser.id]);
+                if (error) throw error;
+                renderRoomList(data || []);
             } catch (e) {
-                alert('Ошибка подключения: ' + e.message);
+                alert('Ошибка загрузки комнат: ' + e.message);
                 console.error(e);
             }
         }
 
-        function renderChatList(rooms) {
+        function renderRoomList(rooms) {
             app.innerHTML = `
                 <div id="chat-list" class="fade-in">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                        <h2>Мои чаты</h2>
-                        <button id="new-chat-btn">+ Новый чат</button>
+                        <h2>🏠 Мои комнаты</h2>
+                        <button id="new-room-btn">➕ Новая</button>
                     </div>
                     <div id="rooms-container">
-                        ${rooms.length === 0 ? '<p style="color:var(--border);">Нет чатов. Создайте новый.</p>' : ''}
+                        ${rooms.length === 0 ? '<p style="color:var(--border);">Нет комнат. Создайте новую.</p>' : ''}
                         ${rooms.map(r => `
                             <div class="room-item" data-roomid="${r.id}">
                                 <div>
-                                    <div class="name">${r.participants.filter(p=>p!==currentUser.login).join(', ')}</div>
+                                    <div class="name">${r.name || 'Комната'}</div>
                                     <div class="last-msg">${r.last_message ? r.last_message.substring(0,30) : 'Нет сообщений'}</div>
                                 </div>
                                 <button class="enter-room" data-roomid="${r.id}">Войти</button>
                             </div>
                         `).join('')}
                     </div>
+                    <div style="margin-top:16px; text-align:center;">
+                        <button id="logout-btn" style="background:transparent; color:var(--border); box-shadow:none;">Выйти</button>
+                    </div>
                 </div>
             `;
-            document.getElementById('new-chat-btn').onclick = createNewRoom;
+            document.getElementById('new-room-btn').onclick = createNewRoom;
+            document.getElementById('logout-btn').onclick = () => {
+                currentUser = null;
+                renderUserSelect();
+            };
             document.querySelectorAll('.enter-room').forEach(btn => {
                 btn.onclick = (e) => {
                     e.stopPropagation();
@@ -364,32 +416,45 @@
             });
         }
 
+        // ─── Создание новой комнаты ─────────────────────────────────
         async function createNewRoom() {
-            const others = Object.keys(USERS).filter(u => u !== currentUser.login);
+            // Выбираем до 4 других пользователей (всего 5)
+            const others = getOtherUsers(currentUser.id);
             if (others.length === 0) { alert('Нет других пользователей'); return; }
-            const partner = prompt('Введите логин собеседника:\n' + others.join(', '));
-            if (!partner) return;
-            if (!USERS[partner]) { alert('Такого пользователя нет'); return; }
-            if (partner === currentUser.login) { alert('Нельзя создать чат с собой'); return; }
+            // Простой выбор – через prompt с перечислением
+            const selected = prompt(
+                'Введите логины участников (через запятую):\n' +
+                others.map(u => `${u.id} (${u.name})`).join(', ')
+            );
+            if (!selected) return;
+            const ids = selected.split(',').map(s => s.trim()).filter(id => {
+                const user = USERS.find(u => u.id === id);
+                if (!user) { alert(`Пользователь ${id} не найден`); return false; }
+                if (id === currentUser.id) { alert('Нельзя добавить себя'); return false; }
+                return true;
+            });
+            if (ids.length === 0) { alert('Нет корректных участников'); return; }
+            // Добавляем текущего пользователя
+            const participants = [currentUser.id, ...ids];
+            // Уникальные
+            const unique = [...new Set(participants)];
+            if (unique.length < 2) { alert('Должен быть хотя бы один собеседник'); return; }
+
             try {
-                const { data: existing } = await supabase
-                    .from('rooms')
-                    .select('id')
-                    .contains('participants', [currentUser.login, partner])
-                    .maybeSingle();
-                if (existing) {
-                    alert('Чат уже существует');
-                    return;
-                }
                 const { data, error } = await supabase
                     .from('rooms')
-                    .insert([{ participants: [currentUser.login, partner] }])
+                    .insert([{
+                        name: `Комната ${unique.join(', ')}`,
+                        admin_id: currentUser.id,
+                        participants: unique,
+                        created_at: new Date().toISOString()
+                    }])
                     .select()
                     .single();
                 if (error) throw error;
                 enterRoom(data);
             } catch (e) {
-                alert('Ошибка создания чата: ' + e.message);
+                alert('Ошибка создания комнаты: ' + e.message);
                 console.error(e);
             }
         }
@@ -406,7 +471,7 @@
                 if (error) throw error;
                 messages = data || [];
                 renderChatWindow(room);
-                // Подписка на новые сообщения
+                // Подписка на сообщения
                 if (messagesSubscription) {
                     supabase.removeChannel(messagesSubscription);
                     messagesSubscription = null;
@@ -424,25 +489,30 @@
                         playNotification();
                     })
                     .subscribe();
-                // Инициализация звонков
+                // Инициализация звонков (групповой)
                 if (callManager) {
                     callManager.cleanup();
                     callManager = null;
                 }
-                callManager = new CallManager(room, currentUser.login);
+                callManager = new CallManager(room, currentUser.id);
             } catch (e) {
                 alert('Ошибка загрузки сообщений: ' + e.message);
                 console.error(e);
             }
         }
 
+        // ─── Окно чата ──────────────────────────────────────────────
         function renderChatWindow(room) {
-            const partner = room.participants.find(p => p !== currentUser.login);
+            const participantsList = room.participants.map(id => {
+                const user = USERS.find(u => u.id === id);
+                return user ? user.name : id;
+            }).join(', ');
+            const isAdmin = room.admin_id === currentUser.id;
             app.innerHTML = `
                 <div id="chat-window" class="fade-in">
                     <div id="chat-header">
                         <button class="back-btn" id="back-btn">←</button>
-                        <span class="partner">${partner}</span>
+                        <span class="partner">${room.name || 'Комната'} <span style="font-size:12px;color:var(--border);">(${participantsList})</span></span>
                         <button id="call-btn" class="call-btn">📞</button>
                     </div>
                     <div id="messages-container"></div>
@@ -454,6 +524,10 @@
                         <button id="send-btn">➤</button>
                     </div>
                     <div id="recording-status" class="hidden recording-indicator"><span class="dot"></span> Запись...</div>
+                    ${isAdmin ? `<div style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <span style="font-size:12px; color:var(--border);">👑 Вы админ</span>
+                        <button id="manage-users-btn" style="font-size:12px; padding:4px 12px;">Управление участниками</button>
+                    </div>` : ''}
                 </div>
             `;
             document.getElementById('back-btn').onclick = () => {
@@ -480,6 +554,9 @@
             document.getElementById('call-btn').onclick = () => {
                 if (callManager) callManager.startCall();
             };
+            if (isAdmin) {
+                document.getElementById('manage-users-btn').onclick = manageUsers;
+            }
             renderMessages();
             const container = document.getElementById('messages-container');
             if (container) container.scrollTop = container.scrollHeight;
@@ -493,7 +570,7 @@
                 return;
             }
             container.innerHTML = messages.map(msg => {
-                const isMine = msg.sender === currentUser.login;
+                const isMine = msg.sender === currentUser.id;
                 const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
                 let content = msg.content;
                 if (msg.type === 'image') {
@@ -524,7 +601,7 @@
             input.value = '';
             const msg = {
                 room_id: currentRoom.id,
-                sender: currentUser.login,
+                sender: currentUser.id,
                 content: text,
                 type: 'text',
                 created_at: new Date().toISOString()
@@ -586,7 +663,7 @@
             if (!compressed) return;
             const msg = {
                 room_id: currentRoom.id,
-                sender: currentUser.login,
+                sender: currentUser.id,
                 content: compressed,
                 type: file.type.startsWith('image/') ? 'image' : 'video',
                 created_at: new Date().toISOString()
@@ -620,7 +697,7 @@
                         const base64 = reader.result;
                         const msg = {
                             room_id: currentRoom.id,
-                            sender: currentUser.login,
+                            sender: currentUser.id,
                             content: base64,
                             type: 'audio',
                             created_at: new Date().toISOString()
@@ -666,24 +743,61 @@
             }
         }
 
-        // ─── Класс CallManager (исправленный, с ICE и аудио) ──────
+        // ─── Управление участниками (админ) ──────────────────────
+        async function manageUsers() {
+            const participants = currentRoom.participants;
+            const list = participants.map(id => {
+                const user = USERS.find(u => u.id === id);
+                return user ? user.name : id;
+            }).join('\n');
+            const action = prompt(
+                `Участники:\n${list}\n\nВведите id пользователя, которого хотите исключить (или 'отмена'):`,
+                ''
+            );
+            if (!action || action === 'отмена') return;
+            const targetId = action.trim();
+            if (targetId === currentUser.id) {
+                alert('Вы не можете исключить себя');
+                return;
+            }
+            if (!participants.includes(targetId)) {
+                alert('Такого пользователя нет в комнате');
+                return;
+            }
+            const newParticipants = participants.filter(id => id !== targetId);
+            try {
+                const { error } = await supabase
+                    .from('rooms')
+                    .update({ participants: newParticipants })
+                    .eq('id', currentRoom.id);
+                if (error) throw error;
+                alert(`Пользователь ${targetId} исключён`);
+                // Обновляем комнату
+                currentRoom.participants = newParticipants;
+                // Если после исключения остался только админ, можно закрыть комнату или оставить
+                renderChatWindow(currentRoom);
+            } catch (e) {
+                alert('Ошибка исключения: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        // ─── Класс CallManager (групповой звонок) ─────────────────
         class CallManager {
-            constructor(room, myLogin) {
+            constructor(room, myId) {
                 this.room = room;
-                this.myLogin = myLogin;
-                this.partner = room.participants.find(p => p !== myLogin);
-                this.pc = null;
+                this.myId = myId;
+                this.participants = room.participants.filter(id => id !== myId);
+                this.peerConnections = {}; // id -> RTCPeerConnection
                 this.localStream = null;
-                this.remoteStream = null;
+                this.audioElements = {};
                 this.channel = null;
                 this.status = 'idle';
-                this.pendingOffer = null;
-                this.audioElement = null;
                 this.subscribe();
             }
 
             subscribe() {
-                if (!this.partner) return;
+                if (this.participants.length === 0) return;
                 this.channel = supabase
                     .channel(`calls-${this.room.id}`)
                     .on('postgres_changes', {
@@ -693,49 +807,48 @@
                         filter: `room_id=eq.${this.room.id}`
                     }, (payload) => {
                         const signal = payload.new;
-                        if (signal.sender === this.myLogin) return;
+                        if (signal.sender === this.myId) return;
                         this.handleSignal(signal);
                     })
                     .subscribe();
             }
 
             async handleSignal(signal) {
-                const { type, data } = signal;
+                const { type, data, sender } = signal;
                 if (type === 'offer') {
-                    this.pendingOffer = data;
-                    this.showIncomingCall();
+                    // Кто-то начал звонок – показываем входящий вызов
+                    this.showIncomingCall(sender, data);
                 } else if (type === 'answer') {
-                    if (this.pc && this.pc.localDescription && this.pc.localDescription.type === 'offer') {
-                        try {
-                            await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
-                            this.status = 'connected';
-                            playCallConnected();
-                            this.showActiveCall();
-                        } catch (e) {
-                            console.error('Ошибка установки remote description (answer):', e);
+                    // Ответ на наш offer
+                    if (this.peerConnections[sender]) {
+                        const pc = this.peerConnections[sender];
+                        if (pc.localDescription && pc.localDescription.type === 'offer') {
+                            try {
+                                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
+                            } catch (e) { console.warn('setRemoteDescription(answer) error:', e); }
                         }
                     }
                 } else if (type === 'ice') {
-                    if (this.pc) {
+                    const pc = this.peerConnections[sender];
+                    if (pc) {
                         try {
-                            await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                        } catch (e) {
-                            console.warn('Ошибка добавления ICE-кандидата:', e);
-                        }
+                            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                        } catch (e) { console.warn('addIceCandidate error:', e); }
                     }
                 } else if (type === 'hangup') {
                     this.cleanup();
-                    alert('Собеседник завершил звонок');
+                    alert('Звонок завершён одним из участников');
                 }
             }
 
-            showIncomingCall() {
+            showIncomingCall(sender, offer) {
                 const overlay = document.createElement('div');
                 overlay.id = 'call-overlay';
+                const callerName = USERS.find(u => u.id === sender)?.name || sender;
                 overlay.innerHTML = `
                     <div class="call-card">
                         <div class="avatar">📞</div>
-                        <div class="status">Входящий звонок от ${this.partner}</div>
+                        <div class="status">Входящий групповой звонок от ${callerName}</div>
                         <button class="call-btn accept" id="accept-call-btn">Принять</button>
                         <button class="call-btn end" id="reject-call-btn" style="margin-left:12px;">Отклонить</button>
                     </div>
@@ -743,36 +856,33 @@
                 document.body.appendChild(overlay);
                 playCallRing();
                 document.getElementById('accept-call-btn').onclick = () => {
-                    this.acceptCall();
+                    this.acceptCall(sender, offer);
                     overlay.remove();
                 };
                 document.getElementById('reject-call-btn').onclick = () => {
-                    this.rejectCall();
+                    this.rejectCall(sender);
                     overlay.remove();
                 };
                 setTimeout(() => {
                     if (document.getElementById('call-overlay')) {
-                        this.rejectCall();
+                        this.rejectCall(sender);
                         overlay.remove();
                         alert('Звонок не принят');
                     }
                 }, 20000);
             }
 
-            async acceptCall() {
+            async acceptCall(sender, offer) {
                 try {
                     this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    this.pc = new RTCPeerConnection({
-                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-                    });
-                    this.setupPc(this.pc);
-                    this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-
-                    const offer = this.pendingOffer;
-                    await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }));
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                    await this.sendSignal('answer', { sdp: answer.sdp });
+                    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                    this.setupPeerConnection(pc, sender);
+                    this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream));
+                    await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    await this.sendSignal(sender, 'answer', { sdp: answer.sdp });
+                    this.peerConnections[sender] = pc;
                     this.status = 'connected';
                     playCallConnected();
                     this.showActiveCall();
@@ -783,34 +893,39 @@
                 }
             }
 
-            rejectCall() {
-                this.sendSignal('hangup', {});
+            rejectCall(sender) {
+                this.sendSignal(sender, 'hangup', {});
                 this.cleanup();
             }
 
             async startCall() {
+                if (this.participants.length === 0) {
+                    alert('Нет других участников для звонка');
+                    return;
+                }
                 if (this.status === 'connected') {
                     this.cleanup();
                     return;
                 }
                 try {
                     this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    this.pc = new RTCPeerConnection({
-                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-                    });
-                    this.setupPc(this.pc);
-                    this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-
-                    const offer = await this.pc.createOffer();
-                    await this.pc.setLocalDescription(offer);
-                    await this.sendSignal('offer', { sdp: offer.sdp });
+                    // Создаём соединение с каждым участником
+                    for (const participantId of this.participants) {
+                        const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                        this.setupPeerConnection(pc, participantId);
+                        this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream));
+                        const offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        await this.sendSignal(participantId, 'offer', { sdp: offer.sdp });
+                        this.peerConnections[participantId] = pc;
+                    }
                     this.status = 'calling';
-                    this.showCallingUI('Вызов...');
+                    this.showCallingUI('Групповой вызов...');
                     playCallRing();
                     setTimeout(() => {
                         if (this.status === 'calling') {
                             this.cleanup();
-                            alert('Не удалось дозвониться');
+                            alert('Не удалось дозвониться до всех');
                         }
                     }, 30000);
                 } catch (e) {
@@ -820,34 +935,28 @@
                 }
             }
 
-            setupPc(pc) {
+            setupPeerConnection(pc, peerId) {
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
-                        this.sendSignal('ice', { candidate: event.candidate });
+                        this.sendSignal(peerId, 'ice', { candidate: event.candidate });
                     }
                 };
                 pc.ontrack = (event) => {
-                    if (!this.remoteStream) {
-                        this.remoteStream = new MediaStream();
+                    if (!this.audioElements[peerId]) {
+                        const audio = document.createElement('audio');
+                        audio.autoplay = true;
+                        audio.style.display = 'none';
+                        document.body.appendChild(audio);
+                        this.audioElements[peerId] = audio;
                     }
-                    this.remoteStream.addTrack(event.track);
-                    // Создаём аудио-элемент, если ещё нет
-                    if (!this.audioElement) {
-                        this.audioElement = document.createElement('audio');
-                        this.audioElement.autoplay = true;
-                        this.audioElement.style.display = 'none';
-                        document.body.appendChild(this.audioElement);
-                    }
-                    this.audioElement.srcObject = this.remoteStream;
-                    this.audioElement.play().catch(e => console.warn('Автовоспроизведение заблокировано:', e));
+                    const stream = new MediaStream();
+                    stream.addTrack(event.track);
+                    this.audioElements[peerId].srcObject = stream;
+                    this.audioElements[peerId].play().catch(e => console.warn('Автовоспроизведение заблокировано:', e));
                 };
                 pc.oniceconnectionstatechange = () => {
                     if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-                        if (this.status !== 'connected') {
-                            this.status = 'connected';
-                            playCallConnected();
-                            this.showActiveCall();
-                        }
+                        // Соединение установлено
                     }
                     if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
                         this.cleanup();
@@ -856,11 +965,11 @@
                 };
             }
 
-            async sendSignal(type, data) {
+            async sendSignal(targetId, type, data) {
                 try {
                     await supabase.from('calls').insert([{
                         room_id: this.room.id,
-                        sender: this.myLogin,
+                        sender: this.myId,
                         type: type,
                         data: data,
                         created_at: new Date().toISOString()
@@ -888,16 +997,14 @@
             }
 
             showActiveCall() {
-                // Удаляем старый overlay, если есть
                 const old = document.getElementById('call-overlay');
                 if (old) old.remove();
-
                 const overlay = document.createElement('div');
                 overlay.id = 'call-overlay';
                 overlay.innerHTML = `
                     <div class="call-card">
                         <div class="avatar">🔊</div>
-                        <div class="status">Разговор с ${this.partner}</div>
+                        <div class="status">Групповой разговор (${Object.keys(this.peerConnections).length} участников)</div>
                         <button class="call-btn end" id="end-call-btn">Завершить</button>
                     </div>
                 `;
@@ -906,39 +1013,42 @@
                     this.cleanup();
                     overlay.remove();
                 };
-                // Создаём аудио-элемент, если его ещё нет
-                if (!this.audioElement && this.remoteStream) {
-                    this.audioElement = document.createElement('audio');
-                    this.audioElement.autoplay = true;
-                    this.audioElement.style.display = 'none';
-                    document.body.appendChild(this.audioElement);
-                    this.audioElement.srcObject = this.remoteStream;
-                    this.audioElement.play().catch(e => console.warn('Автовоспроизведение заблокировано:', e));
-                }
             }
 
             cleanup() {
-                if (this.audioElement) {
-                    this.audioElement.pause();
-                    this.audioElement.srcObject = null;
-                    this.audioElement.remove();
-                    this.audioElement = null;
+                // Закрываем все соединения
+                Object.values(this.peerConnections).forEach(pc => pc.close());
+                this.peerConnections = {};
+                if (this.localStream) {
+                    this.localStream.getTracks().forEach(t => t.stop());
+                    this.localStream = null;
                 }
-                if (this.pc) { this.pc.close(); this.pc = null; }
-                if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
-                if (this.remoteStream) { this.remoteStream.getTracks().forEach(t => t.stop()); this.remoteStream = null; }
-                if (this.channel) { supabase.removeChannel(this.channel); this.channel = null; }
+                Object.values(this.audioElements).forEach(el => {
+                    el.pause();
+                    el.srcObject = null;
+                    el.remove();
+                });
+                this.audioElements = {};
+                if (this.channel) {
+                    supabase.removeChannel(this.channel);
+                    this.channel = null;
+                }
                 this.status = 'idle';
                 const overlay = document.getElementById('call-overlay');
                 if (overlay) overlay.remove();
+                // Отправляем hangup всем
+                for (const id of Object.keys(this.peerConnections)) {
+                    this.sendSignal(id, 'hangup', {});
+                }
             }
         }
 
         // ─── Запуск приложения ──────────────────────────────────────
-        renderLogin();
+        renderUserSelect();
 
-        console.log('✅ Приложение запущено. Используйте логины: ivan, petr, elena, olga, sergey (пароль 123).');
-        console.log('📌 Убедитесь, что в Supabase созданы таблицы и отключена RLS (или добавлены политики).');
+        console.log('✅ Домашний Чат запущен.');
+        console.log('👤 Пользователи:', USERS.map(u => `${u.id} (${u.name})`).join(', '));
+        console.log('📌 Нажмите на свой профиль для входа.');
     </script>
 </body>
 </html>
