@@ -1,299 +1,1018 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Простой Чат с Ссылкой и Логами</title>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <style>
-    * { box-sizing: border-box; font-family: sans-serif; margin: 0; padding: 0; }
-    body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f2f5; }
-    .chat-card { width: 100%; max-width: 450px; height: 650px; background: #fff; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
-    
-    /* Шапка */
-    .header { padding: 15px; background: #007bff; color: white; display: flex; justify-content: space-between; align-items: center; }
-    .header h3 { font-size: 18px; }
-    .header-btns { display: flex; gap: 8px; }
-    .call-btn { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: bold; }
-    .log-btn { background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Русский Чат</title>
+    <!-- Подключаем шрифт (локально не требуется) -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ----- Базовые сбросы и переменные ----- */
+        * { margin:0; padding:0; box-sizing:border-box; }
+        :root {
+            --bg: #2c1810; /* тёмное дерево */
+            --surface: rgba(60, 35, 25, 0.85);
+            --border: #8b6b4b;
+            --text: #f0e0c0;
+            --accent: #d4a373;
+            --accent2: #b5835a;
+            --shadow: 0 8px 32px rgba(0,0,0,0.6);
+            --radius: 16px;
+            --font-main: 'Roboto', sans-serif;
+            --font-head: 'Playfair Display', serif;
+        }
+        html, body { height:100%; background: var(--bg); color: var(--text); font-family: var(--font-main); }
+        body { display:flex; align-items:center; justify-content:center; padding:16px; position:relative; overflow:hidden; }
+        /* Фон с текстурой дерева и падающими листьями */
+        body::before {
+            content: '';
+            position: fixed; inset:0;
+            background: 
+                repeating-linear-gradient(45deg, rgba(60,35,25,0.3) 0px, rgba(60,35,25,0.3) 2px, rgba(90,55,40,0.2) 2px, rgba(90,55,40,0.2) 8px),
+                radial-gradient(circle at 20% 30%, #4a2e1e, #1e110a);
+            z-index:-2;
+        }
+        body::after {
+            content: '';
+            position: fixed; inset:0;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" opacity="0.15"><path d="M100 10 L110 60 L160 70 L120 100 L130 150 L100 120 L70 150 L80 100 L40 70 L90 60 Z" fill="%23b5835a"/></svg>') repeat;
+            background-size: 120px 120px;
+            z-index:-1;
+            pointer-events:none;
+            animation: fall 60s linear infinite;
+        }
+        @keyframes fall {
+            0% { background-position: 0 0; }
+            100% { background-position: 200px 200px; }
+        }
+        /* ----- Общие компоненты ----- */
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            width: 100%;
+            max-width: 480px;
+            transition: all 0.3s;
+        }
+        h1, h2 { font-family: var(--font-head); font-weight: 700; color: var(--accent); text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+        button {
+            font-family: var(--font-main);
+            border: none;
+            background: linear-gradient(145deg, #b5835a, #8b6b4b);
+            color: #2c1810;
+            font-weight: 500;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-size: 14px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+        button:active { transform: scale(0.97); }
+        input, textarea {
+            font-family: var(--font-main);
+            background: rgba(30, 17, 10, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 10px 16px;
+            color: var(--text);
+            width: 100%;
+            outline: none;
+            transition: border 0.2s;
+        }
+        input:focus, textarea:focus { border-color: var(--accent); }
+        .hidden { display: none !important; }
 
-    /* Панель приглашения */
-    .invite-bar { padding: 10px; background: #e9ecef; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #ddd; }
-    .invite-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-    .invite-btn { padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex-shrink: 0; }
+        /* ----- Анимации ----- */
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .pulse { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity:0.8; } 50% { opacity:1; } 100% { opacity:0.8; } }
 
-    /* Панель Логов */
-    .logs-container { display: none; flex-direction: column; background: #1e1e1e; border-bottom: 1px solid #333; }
-    .logs-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #2d2d2d; color: #aaa; font-size: 11px; }
-    .copy-log-btn { background: #007bff; color: white; border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; }
-    .logs-panel { height: 130px; color: #00ff66; font-family: monospace; font-size: 11px; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-    .logs-panel .log-entry { word-break: break-all; }
-    .logs-panel .log-entry.err { color: #ff5555; }
+        /* ----- Экран загрузки (входа) ----- */
+        #login-screen .logo {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        #login-screen .logo svg {
+            width: 80px; height: 80px;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+        }
+        #login-screen .logo h1 {
+            font-size: 32px;
+            letter-spacing: 2px;
+        }
+        #login-screen .logo p {
+            color: var(--border);
+            font-style: italic;
+            font-size: 14px;
+        }
+        .login-field { margin-bottom: 16px; }
+        .login-field label { display: block; font-size: 12px; color: var(--border); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .login-error { color: #e74c3c; font-size: 13px; margin-top: 8px; }
 
-    /* Сообщения */
-    .messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-    .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; word-break: break-word; font-size: 14px; }
-    .msg.my { align-self: flex-end; background: #007bff; color: white; }
-    .msg.peer { align-self: flex-start; background: #e4e6eb; color: #000; }
-    .msg.system { align-self: center; background: #fff3cd; color: #856404; font-size: 12px; }
+        /* ----- Список чатов (главный) ----- */
+        #chat-list .room-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 3px solid var(--accent);
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        #chat-list .room-item:hover { background: rgba(255,255,255,0.1); }
+        #chat-list .room-item .name { font-weight: 500; }
+        #chat-list .room-item .last-msg { font-size: 12px; color: var(--border); }
 
-    /* Футер */
-    .footer { padding: 10px; display: flex; gap: 8px; border-top: 1px solid #eee; align-items: center; }
-    .footer input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
-    .emoji-btn, .send-btn { background: none; border: none; font-size: 20px; cursor: pointer; }
-    .send-btn { color: #007bff; font-weight: bold; font-size: 16px; }
+        /* ----- Чат (окно переписки) ----- */
+        #chat-window {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            max-height: 600px;
+        }
+        #chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        #chat-header .partner { font-weight: 700; font-size: 18px; }
+        #chat-header .back-btn { background: none; box-shadow: none; padding: 8px; font-size: 20px; }
+        #messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 400px;
+        }
+        .msg {
+            max-width: 80%;
+            padding: 8px 14px;
+            border-radius: 18px;
+            animation: fadeIn 0.2s ease;
+            word-wrap: break-word;
+        }
+        .msg.mine {
+            align-self: flex-end;
+            background: var(--accent);
+            color: #1e110a;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.other {
+            align-self: flex-start;
+            background: rgba(255,255,255,0.08);
+            border-bottom-left-radius: 4px;
+        }
+        .msg .time { font-size: 10px; opacity: 0.7; margin-left: 8px; }
+        .msg .name { font-weight: 500; font-size: 12px; display: block; }
+        .msg img, .msg video {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 12px;
+            margin-top: 4px;
+        }
+        .msg .audio-player audio { width: 150px; height: 32px; filter: invert(1); }
 
-    .emoji-picker { display: none; padding: 8px; background: #f8f9fa; border-top: 1px solid #eee; gap: 10px; font-size: 20px; justify-content: space-around; }
-    .emoji-picker span { cursor: pointer; }
-  </style>
+        #composer {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+        #composer textarea {
+            flex: 1;
+            resize: none;
+            border-radius: 30px;
+            padding: 8px 16px;
+            height: 44px;
+            max-height: 100px;
+        }
+        #composer button {
+            padding: 8px 12px;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        #composer .recording-indicator {
+            color: #e74c3c;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .recording-indicator .dot { width: 10px; height: 10px; border-radius: 50%; background: #e74c3c; animation: pulse 1s infinite; }
+
+        /* ----- Аудиовызов (модальное окно) ----- */
+        #call-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        #call-overlay .call-card {
+            background: var(--surface);
+            padding: 32px;
+            border-radius: var(--radius);
+            text-align: center;
+            max-width: 320px;
+            width: 100%;
+        }
+        #call-overlay .call-card .avatar {
+            font-size: 64px;
+            margin-bottom: 8px;
+        }
+        #call-overlay .call-card .status {
+            font-size: 18px;
+            margin-bottom: 16px;
+        }
+        .call-btn { padding: 12px 24px; border-radius: 40px; font-size: 16px; }
+        .call-btn.end { background: #e74c3c; color: white; }
+        .call-btn.accept { background: #27ae60; color: white; }
+
+        /* ----- Адаптив ----- */
+        @media (max-width: 480px) {
+            .card { padding: 16px; }
+            #chat-window { max-height: 80vh; }
+        }
+    </style>
 </head>
 <body>
+    <!-- Контейнер для приложения -->
+    <div id="app" class="card fade-in"></div>
 
-<div class="chat-card">
-  <!-- Шапка -->
-  <div class="header">
-    <h3>Чат</h3>
-    <div class="header-btns">
-      <button class="log-btn" onclick="toggleLogs()">📜 Логи</button>
-      <button class="call-btn" onclick="startCall()">📞 Звонок</button>
-    </div>
-  </div>
+    <!-- Звуки через Web Audio (генерируем) -->
+    <script>
+        // Простые звуки
+        function playBeep(freq=800, dur=200) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + dur/1000);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + dur/1000);
+            } catch(e) {}
+        }
+        function playNotification() { playBeep(1000, 150); }
+        function playCallRing() { playBeep(500, 300); setTimeout(()=>playBeep(700, 300), 400); }
+        function playCallConnected() { playBeep(1200, 100); setTimeout(()=>playBeep(1500, 100), 200); }
+    </script>
 
-  <!-- Панель со ссылкой -->
-  <div class="invite-bar">
-    <span id="status-text">Инициализация...</span>
-    <button class="invite-btn" onclick="copyInviteLink()">📋 Ссылка</button>
-  </div>
+    <script>
+        // ============================================================
+        //  Бэкенд: используем Supabase (бесплатно)
+        //  Инструкция: зарегистрироваться на supabase.com, создать проект,
+        //  получить URL и anon key. Создать таблицы (SQL ниже).
+        //  Заменить константы ниже на свои.
+        // ============================================================
+        const SUPABASE_URL = 'https://ваш-проект.supabase.co';
+        const SUPABASE_ANON_KEY = 'ваш-анонимный-ключ';
 
-  <!-- Контейнер логов с кнопкой копирования -->
-  <div class="logs-container" id="logs-container">
-    <div class="logs-header">
-      <span>Журнал событий</span>
-      <button class="copy-log-btn" onclick="copyAllLogs()">📋 Копировать все логи</button>
-    </div>
-    <div class="logs-panel" id="logs-panel"></div>
-  </div>
-
-  <!-- Сообщения -->
-  <div class="messages" id="messages"></div>
-
-  <!-- Эмодзи -->
-  <div class="emoji-picker" id="emoji-picker">
-    <span onclick="addEmoji('😀')">😀</span>
-    <span onclick="addEmoji('😂')">😂</span>
-    <span onclick="addEmoji('❤️')">❤️</span>
-    <span onclick="addEmoji('👍')">👍</span>
-    <span onclick="addEmoji('🔥')">🔥</span>
-  </div>
-
-  <!-- Ввод -->
-  <div class="footer">
-    <button class="emoji-btn" onclick="toggleEmoji()">😊</button>
-    <input type="text" id="message-input" placeholder="Сообщение..." onkeydown="if(event.key==='Enter') sendMessage()">
-    <button class="send-btn" onclick="sendMessage()">Отправить</button>
-  </div>
-</div>
-
-<audio id="remote-audio" autoplay></audio>
-
-<script>
-  let rawLogs = [];
-
-  function log(msg, isErr = false) {
-    const time = new Date().toLocaleTimeString();
-    const formatted = `[${time}] ${msg}`;
-    rawLogs.push(formatted);
-
-    const logsPanel = document.getElementById('logs-panel');
-    const entry = document.createElement('div');
-    entry.className = `log-entry ${isErr ? 'err' : ''}`;
-    entry.innerText = formatted;
-    logsPanel.appendChild(entry);
-    logsPanel.scrollTop = logsPanel.scrollHeight;
-    console.log(`[LOG] ${msg}`);
-  }
-
-  function copyAllLogs() {
-    if (rawLogs.length === 0) return alert("Логи пусты!");
-    navigator.clipboard.writeText(rawLogs.join('\n')).then(() => {
-      alert("Все логи скопированы в буфер обмена!");
-    });
-  }
-
-  log("Инициализация PeerJS...");
-
-  const peer = new Peer({
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
-      ]
-    }
-  });
-
-  let conn = null;
-  let targetPeerId = null;
-
-  peer.on('open', (id) => {
-    log(`Мой Peer ID получен: ${id}`);
-    const remoteId = window.location.hash.substring(1);
-    
-    if (remoteId && remoteId !== id) {
-      targetPeerId = remoteId;
-      log(`Найден ID из ссылки: ${remoteId}. Попытка подключения...`);
-      document.getElementById('status-text').innerText = 'Подключение к комнате...';
-      connectToPeer(remoteId);
-    } else {
-      log("Готов к принятию новых подключений");
-      document.getElementById('status-text').innerText = 'Готов к подключению';
-    }
-  });
-
-  peer.on('error', (err) => {
-    log(`Ошибка PeerJS (${err.type}): ${err.message}`, true);
-    if (err.type === 'peer-unavailable') {
-      document.getElementById('status-text').innerText = 'Собеседник не найден!';
-      appendMessage('Не удалось найти собеседника. Попросите его отправить свежую ссылку.', 'system');
-    }
-  });
-
-  peer.on('connection', (c) => {
-    log(`Получено входящее подключение от: ${c.peer}`);
-    conn = c;
-    targetPeerId = c.peer;
-    bindConnectionEvents();
-  });
-
-  function connectToPeer(remoteId) {
-    log(`Отправка запроса на подключение к: ${remoteId}`);
-    conn = peer.connect(remoteId, { reliable: true });
-    bindConnectionEvents();
-  }
-
-  function bindConnectionEvents() {
-    if (!conn) return;
-
-    conn.on('open', () => {
-      log("Канал связи открыт! Можно обмениваться сообщениями.");
-      document.getElementById('status-text').innerText = 'В сети ✅';
-      appendMessage('Соединение установлено!', 'system');
-    });
-
-    conn.on('data', (data) => {
-      log(`Получено сообщение: "${data}"`);
-      appendMessage(data, 'peer');
-    });
-
-    conn.on('close', () => {
-      log("Соединение закрыто собеседником", true);
-      document.getElementById('status-text').innerText = 'Собеседник отключился';
-      appendMessage('Собеседник вышел из чата', 'system');
-      conn = null;
-    });
-
-    conn.on('error', (err) => {
-      log(`Ошибка соединения: ${err}`, true);
-      document.getElementById('status-text').innerText = 'Ошибка подключения!';
-    });
-  }
-
-  peer.on('call', async (call) => {
-    log(`Входящий звонок от: ${call.peer}`);
-    if (confirm("Входящий голосовой вызов! Ответить?")) {
-      try {
-        log("Запрос доступа к микрофону...");
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        log("Микрофон доступен, отвечаем на вызов.");
-        call.answer(stream);
-        call.on('stream', (remoteStream) => {
-          log("Получен аудиопоток собеседника.");
-          document.getElementById('remote-audio').srcObject = remoteStream;
+        // Импортируем Supabase (из CDN)
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
+        const supabase = createClient(sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S, sb_secret_ILGAAQwkjpSdjGNl4owIEQ_5Ey9jG0S, {
+            auth: { persistSession: false }
         });
-      } catch (e) {
-        log(`Ошибка доступа к микрофону: ${e.message}`, true);
-        alert("Ошибка доступа к микрофону");
-      }
-    }
-  });
 
-  function copyInviteLink() {
-    if (!peer.id) {
-      log("Попытка скопировать ссылку до инициализации ID", true);
-      return alert("Сеть еще не готова! Подождите секунду.");
-    }
-    const baseUrl = window.location.href.split('#')[0];
-    const link = `${baseUrl}#${peer.id}`;
-    
-    navigator.clipboard.writeText(link).then(() => {
-      log("Ссылка скопирована в буфер обмена");
-      alert("Ссылка скопирована! Отправьте её собеседнику.");
-    });
-  }
+        // ============================================================
+        //  Предустановленные пользователи (5 штук)
+        // ============================================================
+        const USERS = {
+            'ivan': { password: '123', name: 'Иван' },
+            'petr': { password: '123', name: 'Пётр' },
+            'elena': { password: '123', name: 'Елена' },
+            'olga': { password: '123', name: 'Ольга' },
+            'sergey': { password: '123', name: 'Сергей' }
+        };
 
-  function sendMessage() {
-    const input = document.getElementById('message-input');
-    const text = input.value.trim();
-    
-    if (text && conn && conn.open) {
-      log(`Отправка сообщения: "${text}"`);
-      conn.send(text);
-      appendMessage(text, 'my');
-      input.value = '';
-    } else if (!conn || !conn.open) {
-      log("Попытка отправки сообщения без установленного соединения", true);
-      alert("Собеседник еще не подключен или соединение разорвано.");
-    }
-  }
+        // Текущий пользователь
+        let currentUser = null;   // { login, name }
+        let currentRoom = null;   // { id, partner }
+        let messages = [];
+        let callManager = null;
+        let localStream = null;
+        let peerConnection = null;
+        let callStatus = 'idle'; // idle, calling, ringing, connected
+        let callInterval = null;
 
-  function appendMessage(text, type) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `msg ${type}`;
-    msgDiv.innerText = text;
-    const container = document.getElementById('messages');
-    container.appendChild(msgDiv);
-    container.scrollTop = container.scrollHeight;
-  }
+        // ============================================================
+        //  DOM-элементы
+        // ============================================================
+        const app = document.getElementById('app');
 
-  async function startCall() {
-    if (!targetPeerId) {
-      log("Попытка совершить звонок без целевого ID", true);
-      alert("Нет подключенного собеседника!");
-      return;
-    }
-    try {
-      log("Инициализация исходящего вызова, запрос микрофона...");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      log(`Звонок на ID: ${targetPeerId}`);
-      const call = peer.call(targetPeerId, stream);
-      call.on('stream', (remoteStream) => {
-        log("Аудиопоток собеседника получен.");
-        document.getElementById('remote-audio').srcObject = remoteStream;
-      });
-    } catch (err) {
-      log(`Ошибка при звонке: ${err.message}`, true);
-      alert("Не удалось получить доступ к микрофону");
-    }
-  }
+        // ============================================================
+        //  Рендеринг экранов
+        // ============================================================
+        function renderLogin() {
+            app.innerHTML = `
+                <div id="login-screen" class="fade-in">
+                    <div class="logo">
+                        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="50" cy="50" r="45" stroke="#b5835a" stroke-width="2"/>
+                            <path d="M50 10 L60 40 L90 40 L65 60 L75 90 L50 70 L25 90 L35 60 L10 40 L40 40 Z" fill="#d4a373"/>
+                            <circle cx="50" cy="50" r="8" fill="#2c1810"/>
+                        </svg>
+                        <h1>Русский Чат</h1>
+                        <p>Древняя связь</p>
+                    </div>
+                    <div class="login-field">
+                        <label>Логин</label>
+                        <input id="login-input" placeholder="ivan, petr, elena, olga, sergey">
+                    </div>
+                    <div class="login-field">
+                        <label>Пароль</label>
+                        <input id="password-input" type="password" placeholder="123">
+                    </div>
+                    <button id="login-btn" style="width:100%;">Войти в чат</button>
+                    <div id="login-error" class="login-error hidden"></div>
+                </div>
+            `;
+            document.getElementById('login-btn').onclick = doLogin;
+            document.getElementById('login-input').onkeydown = (e) => { if (e.key==='Enter') doLogin(); };
+            document.getElementById('password-input').onkeydown = (e) => { if (e.key==='Enter') doLogin(); };
+        }
 
-  function toggleLogs() {
-    const container = document.getElementById('logs-container');
-    container.style.display = container.style.display === 'flex' ? 'none' : 'flex';
-  }
+        async function doLogin() {
+            const login = document.getElementById('login-input').value.trim().toLowerCase();
+            const password = document.getElementById('password-input').value.trim();
+            const err = document.getElementById('login-error');
+            if (!login || !password) { err.textContent = 'Заполните все поля'; err.classList.remove('hidden'); return; }
+            const user = USERS[login];
+            if (!user || user.password !== password) {
+                err.textContent = 'Неверный логин или пароль';
+                err.classList.remove('hidden');
+                return;
+            }
+            err.classList.add('hidden');
+            currentUser = { login, name: user.name };
+            // Загружаем комнаты пользователя (в Supabase)
+            await loadRooms();
+        }
 
-  function toggleEmoji() {
-    const picker = document.getElementById('emoji-picker');
-    picker.style.display = picker.style.display === 'flex' ? 'none' : 'flex';
-  }
+        // ============================================================
+        //  Работа с комнатами (Supabase)
+        // ============================================================
+        async function loadRooms() {
+            // Получаем все комнаты, где участвует пользователь
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('*')
+                .contains('participants', [currentUser.login]);
+            if (error) { alert('Ошибка загрузки комнат'); console.error(error); return; }
+            renderChatList(data || []);
+        }
 
-  function addEmoji(emoji) {
-    const input = document.getElementById('message-input');
-    input.value += emoji;
-    toggleEmoji();
-    input.focus();
-  }
-</script>
+        function renderChatList(rooms) {
+            app.innerHTML = `
+                <div id="chat-list" class="fade-in">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h2>Мои чаты</h2>
+                        <button id="new-chat-btn">+ Новый чат</button>
+                    </div>
+                    <div id="rooms-container">
+                        ${rooms.length === 0 ? '<p style="color:var(--border);">Нет чатов. Создайте новый.</p>' : ''}
+                        ${rooms.map(r => `
+                            <div class="room-item" data-roomid="${r.id}">
+                                <div>
+                                    <div class="name">${r.participants.filter(p=>p!==currentUser.login).join(', ')}</div>
+                                    <div class="last-msg">${r.last_message ? r.last_message.substring(0,30) : 'Нет сообщений'}</div>
+                                </div>
+                                <button class="enter-room" data-roomid="${r.id}">Войти</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            // Обработчики
+            document.getElementById('new-chat-btn').onclick = createNewRoom;
+            document.querySelectorAll('.enter-room').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const roomId = btn.dataset.roomid;
+                    const room = rooms.find(r => r.id === roomId);
+                    if (room) enterRoom(room);
+                };
+            });
+            document.querySelectorAll('.room-item').forEach(item => {
+                item.onclick = () => {
+                    const roomId = item.dataset.roomid;
+                    const room = rooms.find(r => r.id === roomId);
+                    if (room) enterRoom(room);
+                };
+            });
+        }
 
+        async function createNewRoom() {
+            // Предложить выбрать второго участника (из списка всех пользователей, кроме себя)
+            const others = Object.keys(USERS).filter(u => u !== currentUser.login);
+            if (others.length === 0) { alert('Нет других пользователей'); return; }
+            const partner = prompt('Введите логин собеседника:\n' + others.join(', '));
+            if (!partner) return;
+            if (!USERS[partner]) { alert('Такого пользователя нет'); return; }
+            if (partner === currentUser.login) { alert('Нельзя создать чат с собой'); return; }
+            // Проверим, существует ли уже комната с этими двумя
+            const { data: existing } = await supabase
+                .from('rooms')
+                .select('id')
+                .contains('participants', [currentUser.login, partner])
+                .maybeSingle();
+            if (existing) {
+                alert('Чат уже существует');
+                return;
+            }
+            // Создаём комнату
+            const { data, error } = await supabase
+                .from('rooms')
+                .insert([{ 
+                    participants: [currentUser.login, partner],
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+            if (error) { alert('Ошибка создания'); console.error(error); return; }
+            // Подписываемся на сообщения этой комнаты
+            enterRoom(data);
+        }
+
+        // ============================================================
+        //  Вход в комнату (чат)
+        // ============================================================
+        let messagesSubscription = null;
+
+        async function enterRoom(room) {
+            currentRoom = room;
+            // Получаем сообщения этой комнаты
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .eq('room_id', room.id)
+                .order('created_at', { ascending: true });
+            if (error) { alert('Ошибка загрузки сообщений'); return; }
+            messages = data || [];
+            // Отрисовываем окно чата
+            renderChatWindow(room);
+            // Подписываемся на новые сообщения
+            if (messagesSubscription) {
+                supabase.removeChannel(messagesSubscription);
+            }
+            messagesSubscription = supabase
+                .channel(`room-${room.id}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `room_id=eq.${room.id}`
+                }, (payload) => {
+                    const newMsg = payload.new;
+                    messages.push(newMsg);
+                    renderMessages();
+                    playNotification();
+                })
+                .subscribe();
+            // Настраиваем звонки (инициализируем CallManager)
+            initCallManager(room);
+        }
+
+        function renderChatWindow(room) {
+            const partner = room.participants.find(p => p !== currentUser.login);
+            app.innerHTML = `
+                <div id="chat-window" class="fade-in">
+                    <div id="chat-header">
+                        <button class="back-btn" id="back-btn">←</button>
+                        <span class="partner">${partner}</span>
+                        <button id="call-btn" class="call-btn">📞</button>
+                    </div>
+                    <div id="messages-container">
+                        ${messages.map(msg => renderMessage(msg)).join('')}
+                    </div>
+                    <div id="composer">
+                        <button id="attach-btn" title="Прикрепить фото/видео">📎</button>
+                        <input type="file" id="file-input" accept="image/*,video/*" style="display:none">
+                        <textarea id="msg-input" rows="1" placeholder="Сообщение..."></textarea>
+                        <button id="audio-btn" title="Записать аудио (до 60с)">🎤</button>
+                        <button id="send-btn">➤</button>
+                    </div>
+                    <div id="recording-status" class="hidden recording-indicator"><span class="dot"></span> Запись...</div>
+                </div>
+            `;
+            // Обработчики
+            document.getElementById('back-btn').onclick = () => {
+                if (messagesSubscription) {
+                    supabase.removeChannel(messagesSubscription);
+                    messagesSubscription = null;
+                }
+                if (callManager) { callManager.cleanup(); callManager = null; }
+                loadRooms();
+            };
+            document.getElementById('send-btn').onclick = sendMessage;
+            document.getElementById('msg-input').onkeydown = (e) => {
+                if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+            };
+            document.getElementById('attach-btn').onclick = () => document.getElementById('file-input').click();
+            document.getElementById('file-input').onchange = handleFileUpload;
+            document.getElementById('audio-btn').onclick = toggleRecording;
+            document.getElementById('call-btn').onclick = startCall;
+            renderMessages();
+            // Прокрутка вниз
+            const container = document.getElementById('messages-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function renderMessage(msg) {
+            const isMine = msg.sender === currentUser.login;
+            const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+            let content = msg.content;
+            // Если это медиа
+            if (msg.type === 'image') {
+                content = `<img src="${msg.content}" alt="Фото" loading="lazy">`;
+            } else if (msg.type === 'video') {
+                content = `<video src="${msg.content}" controls style="max-width:200px; max-height:200px;"></video>`;
+            } else if (msg.type === 'audio') {
+                content = `<audio controls src="${msg.content}" style="width:150px; height:32px;"></audio>`;
+            } else {
+                content = msg.content;
+            }
+            return `
+                <div class="msg ${isMine ? 'mine' : 'other'}">
+                    ${!isMine ? `<span class="name">${msg.sender}</span>` : ''}
+                    ${content}
+                    <span class="time">${time}</span>
+                </div>
+            `;
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('messages-container');
+            if (!container) return;
+            container.innerHTML = messages.map(msg => renderMessage(msg)).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // ============================================================
+        //  Отправка сообщений (текст, медиа, аудио)
+        // ============================================================
+        async function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            const msg = {
+                room_id: currentRoom.id,
+                sender: currentUser.login,
+                content: text,
+                type: 'text',
+                created_at: new Date().toISOString()
+            };
+            const { error } = await supabase.from('messages').insert([msg]);
+            if (error) { alert('Ошибка отправки'); console.error(error); }
+        }
+
+        // Сжатие изображений/видео перед отправкой
+        function compressFile(file, maxSizeMB = 1) {
+            return new Promise((resolve) => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const MAX = 800;
+                            let width = img.width, height = img.height;
+                            if (width > height) {
+                                if (width > MAX) { height *= MAX / width; width = MAX; }
+                            } else {
+                                if (height > MAX) { width *= MAX / height; height = MAX; }
+                            }
+                            canvas.width = width; canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            const quality = 0.7;
+                            const dataUrl = canvas.toDataURL(file.type, quality);
+                            resolve(dataUrl);
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                } else if (file.type.startsWith('video/')) {
+                    // Для видео просто конвертируем в base64 (можно сжать через FFmpeg, но сложно)
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve(e.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    resolve(null);
+                }
+            });
+        }
+
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            e.target.value = '';
+            // Проверяем размер (если видео больше 5 МБ, предупреждаем)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Файл слишком большой, отправьте до 5 МБ');
+                return;
+            }
+            const compressed = await compressFile(file);
+            if (!compressed) return;
+            const msg = {
+                room_id: currentRoom.id,
+                sender: currentUser.login,
+                content: compressed,
+                type: file.type.startsWith('image/') ? 'image' : 'video',
+                created_at: new Date().toISOString()
+            };
+            const { error } = await supabase.from('messages').insert([msg]);
+            if (error) { alert('Ошибка отправки медиа'); console.error(error); }
+        }
+
+        // ============================================================
+        //  Аудиозапись (до 60 секунд)
+        // ============================================================
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordingTimer = null;
+        let recordingStart = 0;
+
+        async function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = async function() {
+                        const base64 = reader.result;
+                        const msg = {
+                            room_id: currentRoom.id,
+                            sender: currentUser.login,
+                            content: base64,
+                            type: 'audio',
+                            created_at: new Date().toISOString()
+                        };
+                        await supabase.from('messages').insert([msg]);
+                        stream.getTracks().forEach(t => t.stop());
+                    };
+                    reader.readAsDataURL(blob);
+                    isRecording = false;
+                    document.getElementById('recording-status').classList.add('hidden');
+                    document.getElementById('audio-btn').textContent = '🎤';
+                    clearInterval(recordingTimer);
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStart = Date.now();
+                document.getElementById('recording-status').classList.remove('hidden');
+                document.getElementById('audio-btn').textContent = '⏹️';
+                // Таймер 60 секунд
+                recordingTimer = setInterval(() => {
+                    const elapsed = (Date.now() - recordingStart) / 1000;
+                    if (elapsed >= 60) {
+                        stopRecording();
+                    }
+                }, 1000);
+            } catch (e) {
+                alert('Нет доступа к микрофону');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+            } else {
+                isRecording = false;
+                document.getElementById('recording-status').classList.add('hidden');
+                document.getElementById('audio-btn').textContent = '🎤';
+                clearInterval(recordingTimer);
+            }
+        }
+
+        // ============================================================
+        //  Аудиозвонки (WebRTC + сигналинг через Supabase)
+        // ============================================================
+        function initCallManager(room) {
+            if (callManager) callManager.cleanup();
+            callManager = new CallManager(room, currentUser.login);
+        }
+
+        class CallManager {
+            constructor(room, myLogin) {
+                this.room = room;
+                this.myLogin = myLogin;
+                this.peer = null;
+                this.pc = null;
+                this.localStream = null;
+                this.remoteStream = null;
+                this.channel = null;
+                this.status = 'idle';
+                this.pendingOffer = null;
+                // Подписываемся на сигналы
+                this.subscribe();
+            }
+
+            subscribe() {
+                // Получаем логин собеседника
+                this.partner = this.room.participants.find(p => p !== this.myLogin);
+                if (!this.partner) return;
+                // Слушаем таблицу calls
+                this.channel = supabase
+                    .channel(`calls-${this.room.id}`)
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'calls',
+                        filter: `room_id=eq.${this.room.id}`
+                    }, (payload) => {
+                        const signal = payload.new;
+                        this.handleSignal(signal);
+                    })
+                    .subscribe();
+                // При разрыве страницы удаляем сигналы
+                window.addEventListener('beforeunload', () => {
+                    this.cleanup();
+                });
+            }
+
+            async handleSignal(signal) {
+                if (signal.sender === this.myLogin) return;
+                const { type, data } = signal;
+                if (type === 'offer') {
+                    // Входящий звонок
+                    this.pendingOffer = data;
+                    this.showIncomingCall();
+                } else if (type === 'answer') {
+                    if (this.pc && this.pc.localDescription && this.pc.localDescription.type === 'offer') {
+                        await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
+                    }
+                } else if (type === 'ice') {
+                    if (this.pc) {
+                        try {
+                            await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                        } catch(e) {}
+                    }
+                } else if (type === 'hangup') {
+                    this.cleanup();
+                    alert('Собеседник завершил звонок');
+                }
+            }
+
+            showIncomingCall() {
+                // Показываем модальное окно
+                const overlay = document.createElement('div');
+                overlay.id = 'call-overlay';
+                overlay.innerHTML = `
+                    <div class="call-card">
+                        <div class="avatar">📞</div>
+                        <div class="status">Входящий звонок от ${this.partner}</div>
+                        <button class="call-btn accept" id="accept-call-btn">Принять</button>
+                        <button class="call-btn end" id="reject-call-btn" style="margin-left:12px;">Отклонить</button>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                playCallRing();
+                document.getElementById('accept-call-btn').onclick = () => {
+                    this.acceptCall();
+                    overlay.remove();
+                };
+                document.getElementById('reject-call-btn').onclick = () => {
+                    this.rejectCall();
+                    overlay.remove();
+                };
+                // Автоматически отклоняем через 20 секунд
+                setTimeout(() => {
+                    if (document.getElementById('call-overlay')) {
+                        this.rejectCall();
+                        overlay.remove();
+                        alert('Звонок не принят');
+                    }
+                }, 20000);
+            }
+
+            async acceptCall() {
+                try {
+                    this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    this.pc = new RTCPeerConnection({
+                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                    });
+                    this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
+                    this.pc.ontrack = (e) => {
+                        if (!this.remoteStream) {
+                            this.remoteStream = new MediaStream();
+                            this.remoteStream.addTrack(e.track);
+                        } else {
+                            this.remoteStream.addTrack(e.track);
+                        }
+                    };
+                    // Создаём ответ
+                    const offer = this.pendingOffer;
+                    await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }));
+                    const answer = await this.pc.createAnswer();
+                    await this.pc.setLocalDescription(answer);
+                    // Отправляем ответ
+                    await this.sendSignal('answer', { sdp: answer.sdp });
+                    this.status = 'connected';
+                    playCallConnected();
+                    this.startCallUI();
+                } catch (e) {
+                    alert('Ошибка принятия звонка');
+                    console.error(e);
+                }
+            }
+
+            rejectCall() {
+                this.sendSignal('hangup', {});
+                this.cleanup();
+            }
+
+            async startCall() {
+                if (this.status === 'connected') {
+                    this.cleanup();
+                    return;
+                }
+                try {
+                    this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    this.pc = new RTCPeerConnection({
+                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                    });
+                    this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
+                    this.pc.ontrack = (e) => {
+                        if (!this.remoteStream) {
+                            this.remoteStream = new MediaStream();
+                            this.remoteStream.addTrack(e.track);
+                        } else {
+                            this.remoteStream.addTrack(e.track);
+                        }
+                    };
+                    const offer = await this.pc.createOffer();
+                    await this.pc.setLocalDescription(offer);
+                    // Отправляем offer
+                    await this.sendSignal('offer', { sdp: offer.sdp });
+                    this.status = 'calling';
+                    this.showCallingUI('Вызов...');
+                    playCallRing();
+                    // Таймаут 30 секунд
+                    setTimeout(() => {
+                        if (this.status === 'calling') {
+                            this.cleanup();
+                            alert('Не удалось дозвониться');
+                        }
+                    }, 30000);
+                } catch (e) {
+                    alert('Нет доступа к микрофону');
+                    console.error(e);
+                }
+            }
+
+            async sendSignal(type, data) {
+                await supabase.from('calls').insert([{
+                    room_id: this.room.id,
+                    sender: this.myLogin,
+                    type: type,
+                    data: data,
+                    created_at: new Date().toISOString()
+                }]);
+            }
+
+            showCallingUI(text) {
+                const overlay = document.createElement('div');
+                overlay.id = 'call-overlay';
+                overlay.innerHTML = `
+                    <div class="call-card">
+                        <div class="avatar">📞</div>
+                        <div class="status">${text}</div>
+                        <button class="call-btn end" id="end-call-btn">Завершить</button>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                document.getElementById('end-call-btn').onclick = () => {
+                    this.cleanup();
+                    overlay.remove();
+                };
+            }
+
+            startCallUI() {
+                // При соединении показываем статус
+                const overlay = document.createElement('div');
+                overlay.id = 'call-overlay';
+                overlay.innerHTML = `
+                    <div class="call-card">
+                        <div class="avatar">🔊</div>
+                        <div class="status">Разговор с ${this.partner}</div>
+                        <button class="call-btn end" id="end-call-btn">Завершить</button>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                document.getElementById('end-call-btn').onclick = () => {
+                    this.cleanup();
+                    overlay.remove();
+                };
+            }
+
+            cleanup() {
+                if (this.pc) { this.pc.close(); this.pc = null; }
+                if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
+                if (this.remoteStream) { this.remoteStream.getTracks().forEach(t => t.stop()); this.remoteStream = null; }
+                if (this.channel) { supabase.removeChannel(this.channel); this.channel = null; }
+                this.status = 'idle';
+                const overlay = document.getElementById('call-overlay');
+                if (overlay) overlay.remove();
+                // Отправляем hangup если нужно
+                // (но не отправляем, чтобы не зациклиться)
+            }
+        }
+
+        // ============================================================
+        //  Инициализация
+        // ============================================================
+        renderLogin();
+
+        // ============================================================
+        //  Инструкции для настройки Supabase
+        //  (в комментариях)
+        // ============================================================
+        /*
+            Инструкция по настройке Supabase:
+            1. Зарегистрируйтесь на https://supabase.com и создайте новый проект.
+            2. В разделе SQL Editor выполните следующие запросы:
+
+            -- Таблица комнат
+            CREATE TABLE rooms (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                participants TEXT[] NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                last_message TEXT
+            );
+
+            -- Таблица сообщений
+            CREATE TABLE messages (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
+                sender TEXT NOT NULL,
+                content TEXT NOT NULL,
+                type TEXT DEFAULT 'text',
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            -- Таблица сигналов звонков
+            CREATE TABLE calls (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
+                sender TEXT NOT NULL,
+                type TEXT NOT NULL,
+                data JSONB,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            -- Включаем Realtime для таблиц (в разделе Database > Replication)
+            -- Подпишите на изменения таблиц messages и calls.
+
+            3. Получите URL и anon key в разделе API Settings.
+            4. Замените константы SUPABASE_URL и SUPABASE_ANON_KEY в коде.
+
+            Для работы с медиа (фото/видео) используется base64, что может быть тяжеловесно,
+            но для небольшого чата подойдёт. Для продакшена лучше использовать Storage.
+
+            Примечание: Для аудиозвонков используйте TURN-сервер для надёжности.
+            Можно добавить бесплатный TURN от Xirsys (как обсуждалось ранее).
+            В коде используется только STUN, что может не работать за строгими NAT.
+        */
+    </script>
 </body>
 </html>
