@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// Вставьте в Firebase Console → Storage → Rules.
+// Подробности в README.md (Шаг 4).
+// ─────────────────────────────────────────────────────────────
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /chatImages/{chatId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
