@@ -231,9 +231,11 @@
         const SUPABASE_ANON_KEY = 'ваш-анонимный-ключ';
 
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
-        const supabase = createClient(https://uqtiieyrjzcqulpojlfd.supabase.co, sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S, {
-            auth: { persistSession: false }
-        });
+      const supabase = createClient(
+    'https://uqtiieyrjzcqulpojlfd.supabase.co',
+    'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S',
+    { auth: { persistSession: false } }
+);
 
         // ─── Предустановленные пользователи ────────────────────────
         const USERS = {
