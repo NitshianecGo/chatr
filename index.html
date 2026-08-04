@@ -226,7 +226,6 @@
         function playCallConnected() { playBeep(1200, 100); setTimeout(()=>playBeep(1500, 100), 200); }
 
         // ─── Supabase ────────────────────────────────────────────────
-        // ВАШИ КЛЮЧИ
         const SUPABASE_URL = 'https://uqtiieyrjzcqulpojlfd.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S';
 
@@ -235,7 +234,7 @@
             auth: { persistSession: false }
         });
 
-        // ─── Предустановленные пользователи ────────────────────────
+        // ─── Пользователи ────────────────────────────────────────────
         const USERS = {
             'ivan': { password: '123', name: 'Иван' },
             'petr': { password: '123', name: 'Пётр' },
@@ -667,7 +666,7 @@
             }
         }
 
-        // ─── Класс CallManager (звонки) ─────────────────────────────
+        // ─── Класс CallManager (исправленный, с ICE и аудио) ──────
         class CallManager {
             constructor(room, myLogin) {
                 this.room = room;
@@ -679,6 +678,7 @@
                 this.channel = null;
                 this.status = 'idle';
                 this.pendingOffer = null;
+                this.audioElement = null;
                 this.subscribe();
             }
 
@@ -706,16 +706,22 @@
                     this.showIncomingCall();
                 } else if (type === 'answer') {
                     if (this.pc && this.pc.localDescription && this.pc.localDescription.type === 'offer') {
-                        await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
-                        this.status = 'connected';
-                        playCallConnected();
-                        this.showActiveCall();
+                        try {
+                            await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
+                            this.status = 'connected';
+                            playCallConnected();
+                            this.showActiveCall();
+                        } catch (e) {
+                            console.error('Ошибка установки remote description (answer):', e);
+                        }
                     }
                 } else if (type === 'ice') {
                     if (this.pc) {
                         try {
                             await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                        } catch(e) {}
+                        } catch (e) {
+                            console.warn('Ошибка добавления ICE-кандидата:', e);
+                        }
                     }
                 } else if (type === 'hangup') {
                     this.cleanup();
@@ -759,15 +765,9 @@
                     this.pc = new RTCPeerConnection({
                         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
                     });
+                    this.setupPc(this.pc);
                     this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-                    this.pc.ontrack = (e) => {
-                        if (!this.remoteStream) {
-                            this.remoteStream = new MediaStream();
-                            this.remoteStream.addTrack(e.track);
-                        } else {
-                            this.remoteStream.addTrack(e.track);
-                        }
-                    };
+
                     const offer = this.pendingOffer;
                     await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }));
                     const answer = await this.pc.createAnswer();
@@ -777,8 +777,9 @@
                     playCallConnected();
                     this.showActiveCall();
                 } catch (e) {
-                    alert('Ошибка принятия звонка');
+                    alert('Ошибка принятия звонка: ' + e.message);
                     console.error(e);
+                    this.cleanup();
                 }
             }
 
@@ -797,15 +798,9 @@
                     this.pc = new RTCPeerConnection({
                         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
                     });
+                    this.setupPc(this.pc);
                     this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-                    this.pc.ontrack = (e) => {
-                        if (!this.remoteStream) {
-                            this.remoteStream = new MediaStream();
-                            this.remoteStream.addTrack(e.track);
-                        } else {
-                            this.remoteStream.addTrack(e.track);
-                        }
-                    };
+
                     const offer = await this.pc.createOffer();
                     await this.pc.setLocalDescription(offer);
                     await this.sendSignal('offer', { sdp: offer.sdp });
@@ -821,7 +816,44 @@
                 } catch (e) {
                     alert('Нет доступа к микрофону');
                     console.error(e);
+                    this.cleanup();
                 }
+            }
+
+            setupPc(pc) {
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        this.sendSignal('ice', { candidate: event.candidate });
+                    }
+                };
+                pc.ontrack = (event) => {
+                    if (!this.remoteStream) {
+                        this.remoteStream = new MediaStream();
+                    }
+                    this.remoteStream.addTrack(event.track);
+                    // Создаём аудио-элемент, если ещё нет
+                    if (!this.audioElement) {
+                        this.audioElement = document.createElement('audio');
+                        this.audioElement.autoplay = true;
+                        this.audioElement.style.display = 'none';
+                        document.body.appendChild(this.audioElement);
+                    }
+                    this.audioElement.srcObject = this.remoteStream;
+                    this.audioElement.play().catch(e => console.warn('Автовоспроизведение заблокировано:', e));
+                };
+                pc.oniceconnectionstatechange = () => {
+                    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                        if (this.status !== 'connected') {
+                            this.status = 'connected';
+                            playCallConnected();
+                            this.showActiveCall();
+                        }
+                    }
+                    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                        this.cleanup();
+                        alert('Соединение потеряно');
+                    }
+                };
             }
 
             async sendSignal(type, data) {
@@ -856,6 +888,10 @@
             }
 
             showActiveCall() {
+                // Удаляем старый overlay, если есть
+                const old = document.getElementById('call-overlay');
+                if (old) old.remove();
+
                 const overlay = document.createElement('div');
                 overlay.id = 'call-overlay';
                 overlay.innerHTML = `
@@ -870,9 +906,24 @@
                     this.cleanup();
                     overlay.remove();
                 };
+                // Создаём аудио-элемент, если его ещё нет
+                if (!this.audioElement && this.remoteStream) {
+                    this.audioElement = document.createElement('audio');
+                    this.audioElement.autoplay = true;
+                    this.audioElement.style.display = 'none';
+                    document.body.appendChild(this.audioElement);
+                    this.audioElement.srcObject = this.remoteStream;
+                    this.audioElement.play().catch(e => console.warn('Автовоспроизведение заблокировано:', e));
+                }
             }
 
             cleanup() {
+                if (this.audioElement) {
+                    this.audioElement.pause();
+                    this.audioElement.srcObject = null;
+                    this.audioElement.remove();
+                    this.audioElement = null;
+                }
                 if (this.pc) { this.pc.close(); this.pc = null; }
                 if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
                 if (this.remoteStream) { this.remoteStream.getTracks().forEach(t => t.stop()); this.remoteStream = null; }
@@ -886,7 +937,6 @@
         // ─── Запуск приложения ──────────────────────────────────────
         renderLogin();
 
-        // ─── Инструкция (в консоль) ──────────────────────────────
         console.log('✅ Приложение запущено. Используйте логины: ivan, petr, elena, olga, sergey (пароль 123).');
         console.log('📌 Убедитесь, что в Supabase созданы таблицы и отключена RLS (или добавлены политики).');
     </script>
