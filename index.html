@@ -231,7 +231,7 @@
 
     <script type="module">
         // ------------------------------------------------------------
-        // 1. ВСПОМОГАТЕЛЬНЫЕ ЗВУКИ
+        // 1. Звуки (без изменений)
         // ------------------------------------------------------------
         function playBeep(freq=800, dur=200) {
             try {
@@ -253,12 +253,11 @@
         function playCallConnected() { playBeep(1200, 100); setTimeout(()=>playBeep(1500, 100), 200); }
 
         // ------------------------------------------------------------
-        // 2. SUPABASE (или отказоустойчивый режим)
+        // 2. Supabase (или заглушка)
         // ------------------------------------------------------------
         const SUPABASE_URL = 'https://uqtiieyrjzcqulpojlfd.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S';
 
-        // Импортируем клиент. Если не загрузится – используем заглушку.
         let supabase = null;
         try {
             const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
@@ -268,7 +267,7 @@
         }
 
         // ------------------------------------------------------------
-        // 3. СЛУЧАЙНЫЕ ИМЕНА ЖИВОТНЫХ
+        // 3. Имена
         // ------------------------------------------------------------
         const ADJECTIVES = ['Весёлый', 'Грустный', 'Сонный', 'Голодный', 'Смешной', 'Умный', 'Быстрый', 'Храбрый', 'Ленивый', 'Добрый'];
         const ANIMALS = ['Лис', 'Волк', 'Медведь', 'Заяц', 'Ёж', 'Сова', 'Орёл', 'Кот', 'Пёс', 'Тигр', 'Лев', 'Слон', 'Олень', 'Барсук', 'Бобр'];
@@ -277,10 +276,31 @@
         }
 
         // ------------------------------------------------------------
-        // 4. ПОЛЬЗОВАТЕЛИ (всегда доступны)
+        // 4. Работа с localStorage (с защитой от ошибок)
+        // ------------------------------------------------------------
+        function saveLocalData(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                // игнорируем
+            }
+        }
+
+        function loadLocalData(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) return JSON.parse(raw);
+                return fallback;
+            } catch (e) {
+                return fallback;
+            }
+        }
+
+        // ------------------------------------------------------------
+        // 5. Пользователи и состояние
         // ------------------------------------------------------------
         const USER_IDS = ['user1', 'user2', 'user3', 'user4', 'user5'];
-        let activeUsers = {};    // id -> { id, display_name, is_active }
+        let activeUsers = {};
         let currentUser = null;
         let currentRoom = null;
         let messages = [];
@@ -295,39 +315,37 @@
         const app = document.getElementById('app');
 
         // ------------------------------------------------------------
-        // 5. ИНИЦИАЛИЗАЦИЯ ПОЛЬЗОВАТЕЛЕЙ
+        // 6. Инициализация пользователей
         // ------------------------------------------------------------
         async function initUsers() {
-            try {
-                if (supabase) {
+            let localUsers = loadLocalData('chat_users', null);
+            if (localUsers && Object.keys(localUsers).length > 0) {
+                activeUsers = localUsers;
+            } else {
+                // генерируем новых
+                for (const id of USER_IDS) {
+                    activeUsers[id] = { id, display_name: generateAnimalName(), is_active: false };
+                }
+                saveLocalData('chat_users', activeUsers);
+            }
+
+            // Если есть Supabase – попытаемся синхронизировать
+            if (supabase) {
+                try {
                     const { data, error } = await supabase.from('users').select('*');
                     if (!error && data.length > 0) {
                         data.forEach(u => { activeUsers[u.id] = u; });
-                        return;
+                        saveLocalData('chat_users', activeUsers);
                     }
-                }
-                // Если нет данных – берём из localStorage или генерируем
-                let stored = localStorage.getItem('chat_users');
-                if (stored) {
-                    activeUsers = JSON.parse(stored);
-                } else {
-                    for (const id of USER_IDS) {
-                        activeUsers[id] = { id, display_name: generateAnimalName(), is_active: false };
-                    }
-                    localStorage.setItem('chat_users', JSON.stringify(activeUsers));
-                }
-            } catch (e) {
-                console.warn('Ошибка загрузки пользователей, используем локальные', e);
-                // fallback
-                for (const id of USER_IDS) {
-                    if (!activeUsers[id]) activeUsers[id] = { id, display_name: generateAnimalName(), is_active: false };
+                } catch (e) {
+                    console.warn('Не удалось синхронизировать с Supabase', e);
                 }
             }
             renderUserSelect();
         }
 
         // ------------------------------------------------------------
-        // 6. ОТРИСОВКА ЭКРАНА ВЫБОРА ПОЛЬЗОВАТЕЛЯ
+        // 7. Отрисовка выбора пользователя
         // ------------------------------------------------------------
         function renderUserSelect() {
             const users = Object.values(activeUsers);
@@ -359,18 +377,23 @@
         }
 
         // ------------------------------------------------------------
-        // 7. ВХОД/ВЫХОД
+        // 8. Вход/выход
         // ------------------------------------------------------------
         async function loginUser(id) {
             try {
                 const newName = generateAnimalName();
-                // Обновляем в БД, если есть
+                // Обновляем в Supabase (если доступен)
                 if (supabase) {
-                    await supabase.from('users').update({ display_name: newName, is_active: true }).eq('id', id);
+                    try {
+                        await supabase.from('users').update({ display_name: newName, is_active: true }).eq('id', id);
+                    } catch (e) {
+                        console.warn('Ошибка обновления в Supabase', e);
+                    }
                 }
+                // Локально
                 activeUsers[id].display_name = newName;
                 activeUsers[id].is_active = true;
-                localStorage.setItem('chat_users', JSON.stringify(activeUsers));
+                saveLocalData('chat_users', activeUsers);
                 currentUser = { id, display_name: newName };
                 await loadRooms();
             } catch (e) {
@@ -382,27 +405,33 @@
         async function logoutUser() {
             try {
                 if (supabase) {
-                    await supabase.from('users').update({ is_active: false }).eq('id', currentUser.id);
+                    try {
+                        await supabase.from('users').update({ is_active: false }).eq('id', currentUser.id);
+                    } catch (e) {}
                 }
                 activeUsers[currentUser.id].is_active = false;
-                localStorage.setItem('chat_users', JSON.stringify(activeUsers));
+                saveLocalData('chat_users', activeUsers);
             } catch (e) {}
             currentUser = null;
             renderUserSelect();
         }
 
         // ------------------------------------------------------------
-        // 8. КОМНАТЫ (загрузка, создание, список)
+        // 9. Комнаты
         // ------------------------------------------------------------
         async function loadRooms() {
             try {
                 let data = [];
                 if (supabase) {
-                    const { data: d, error } = await supabase
-                        .from('rooms')
-                        .select('*')
-                        .contains('participants', [currentUser.id]);
-                    if (!error) data = d || [];
+                    try {
+                        const { data: d, error } = await supabase
+                            .from('rooms')
+                            .select('*')
+                            .contains('participants', [currentUser.id]);
+                        if (!error) data = d || [];
+                    } catch (e) {
+                        console.warn('Ошибка загрузки комнат из Supabase', e);
+                    }
                 }
                 renderRoomList(data);
             } catch (e) {
@@ -455,12 +484,13 @@
         }
 
         // ------------------------------------------------------------
-        // 9. ДИАЛОГ СОЗДАНИЯ КОМНАТЫ (с выбором участников)
+        // 10. Создание комнаты (с выбором участников)
         // ------------------------------------------------------------
         async function showCreateRoomDialog() {
-            const activeList = Object.values(activeUsers).filter(u => u.is_active && u.id !== currentUser.id);
-            if (activeList.length === 0) {
-                alert('Нет доступных пользователей для добавления.');
+            // Показываем всех пользователей, кроме текущего
+            const available = Object.values(activeUsers).filter(u => u.id !== currentUser.id);
+            if (available.length === 0) {
+                alert('Нет других пользователей для добавления.');
                 return;
             }
             const overlay = document.createElement('div');
@@ -470,7 +500,7 @@
                     <h3 style="margin-bottom:12px;">Создать комнату</h3>
                     <p style="font-size:14px; color:var(--border);">Выберите участников (можно нескольких):</p>
                     <div class="participant-selector" id="participant-selector">
-                        ${activeList.map(u => `
+                        ${available.map(u => `
                             <button class="sel-btn" data-id="${u.id}">${u.display_name}</button>
                         `).join('')}
                     </div>
@@ -507,20 +537,24 @@
                 try {
                     let room;
                     if (supabase) {
-                        const { data, error } = await supabase
-                            .from('rooms')
-                            .insert([{
-                                name: `Комната ${participants.join(', ')}`,
-                                admin_id: currentUser.id,
-                                participants: participants,
-                                created_at: new Date().toISOString()
-                            }])
-                            .select()
-                            .single();
-                        if (error) throw error;
-                        room = data;
+                        try {
+                            const { data, error } = await supabase
+                                .from('rooms')
+                                .insert([{
+                                    name: `Комната ${participants.join(', ')}`,
+                                    admin_id: currentUser.id,
+                                    participants: participants,
+                                    created_at: new Date().toISOString()
+                                }])
+                                .select()
+                                .single();
+                            if (error) throw error;
+                            room = data;
+                        } catch (e) {
+                            console.warn('Ошибка создания комнаты в Supabase, создаём локально', e);
+                            room = { id: 'local-' + Date.now(), name: 'Комната', admin_id: currentUser.id, participants };
+                        }
                     } else {
-                        // локальный режим – просто создаём объект
                         room = { id: 'local-' + Date.now(), name: 'Комната', admin_id: currentUser.id, participants };
                     }
                     enterRoom(room);
@@ -533,23 +567,26 @@
         }
 
         // ------------------------------------------------------------
-        // 10. ВХОД В КОМНАТУ
+        // 11. Вход в комнату
         // ------------------------------------------------------------
         async function enterRoom(room) {
             currentRoom = room;
             try {
                 let data = [];
                 if (supabase) {
-                    const { data: d, error } = await supabase
-                        .from('messages')
-                        .select('*')
-                        .eq('room_id', room.id)
-                        .order('created_at', { ascending: true });
-                    if (!error) data = d || [];
+                    try {
+                        const { data: d, error } = await supabase
+                            .from('messages')
+                            .select('*')
+                            .eq('room_id', room.id)
+                            .order('created_at', { ascending: true });
+                        if (!error) data = d || [];
+                    } catch (e) {
+                        console.warn('Ошибка загрузки сообщений из Supabase', e);
+                    }
                 }
                 messages = data;
                 renderChatWindow(room);
-                // Подписка на новые сообщения (только если есть supabase)
                 if (supabase) {
                     if (messagesSubscription) supabase.removeChannel(messagesSubscription);
                     messagesSubscription = supabase
@@ -566,7 +603,6 @@
                         })
                         .subscribe();
                 }
-                // Инициализация звонков
                 if (callManager) callManager.cleanup();
                 callManager = new CallManager(room, currentUser.id);
             } catch (e) {
@@ -576,7 +612,7 @@
         }
 
         // ------------------------------------------------------------
-        // 11. ОКНО ЧАТА
+        // 12. Окно чата
         // ------------------------------------------------------------
         function renderChatWindow(room) {
             const participantsList = room.participants.map(id => {
@@ -663,7 +699,7 @@
         }
 
         // ------------------------------------------------------------
-        // 12. ОТПРАВКА СООБЩЕНИЙ (текст, фото, видео, аудио)
+        // 13. Отправка сообщений
         // ------------------------------------------------------------
         async function sendMessage() {
             const input = document.getElementById('msg-input');
@@ -679,9 +715,14 @@
             };
             try {
                 if (supabase) {
-                    await supabase.from('messages').insert([msg]);
+                    try {
+                        await supabase.from('messages').insert([msg]);
+                    } catch (e) {
+                        console.warn('Ошибка отправки в Supabase, сохраняем локально', e);
+                        messages.push(msg);
+                        renderMessages();
+                    }
                 } else {
-                    // локально – добавляем в массив
                     messages.push(msg);
                     renderMessages();
                 }
@@ -746,7 +787,13 @@
             };
             try {
                 if (supabase) {
-                    await supabase.from('messages').insert([msg]);
+                    try {
+                        await supabase.from('messages').insert([msg]);
+                    } catch (e) {
+                        console.warn('Ошибка отправки медиа в Supabase, сохраняем локально', e);
+                        messages.push(msg);
+                        renderMessages();
+                    }
                 } else {
                     messages.push(msg);
                     renderMessages();
@@ -758,7 +805,7 @@
         }
 
         // ------------------------------------------------------------
-        // 13. АУДИОЗАПИСЬ (до 60 сек)
+        // 14. Аудиозапись
         // ------------------------------------------------------------
         async function toggleRecording() {
             if (isRecording) {
@@ -786,7 +833,13 @@
                         };
                         try {
                             if (supabase) {
-                                await supabase.from('messages').insert([msg]);
+                                try {
+                                    await supabase.from('messages').insert([msg]);
+                                } catch (e) {
+                                    console.warn('Ошибка отправки аудио в Supabase, сохраняем локально', e);
+                                    messages.push(msg);
+                                    renderMessages();
+                                }
                             } else {
                                 messages.push(msg);
                                 renderMessages();
@@ -831,7 +884,7 @@
         }
 
         // ------------------------------------------------------------
-        // 14. УПРАВЛЕНИЕ УЧАСТНИКАМИ (админ)
+        // 15. Управление участниками (админ)
         // ------------------------------------------------------------
         async function manageUsers() {
             const participants = currentRoom.participants;
@@ -856,7 +909,11 @@
             const newParticipants = participants.filter(id => id !== targetId);
             try {
                 if (supabase) {
-                    await supabase.from('rooms').update({ participants: newParticipants }).eq('id', currentRoom.id);
+                    try {
+                        await supabase.from('rooms').update({ participants: newParticipants }).eq('id', currentRoom.id);
+                    } catch (e) {
+                        console.warn('Ошибка обновления комнаты в Supabase', e);
+                    }
                 }
                 currentRoom.participants = newParticipants;
                 renderChatWindow(currentRoom);
@@ -868,7 +925,7 @@
         }
 
         // ------------------------------------------------------------
-        // 15. КЛАСС CALL MANAGER (групповые звонки с буферизацией ICE)
+        // 16. Класс CallManager (с защитой от ошибок)
         // ------------------------------------------------------------
         class CallManager {
             constructor(room, myId) {
@@ -1077,13 +1134,17 @@
             async sendSignal(targetId, type, data) {
                 try {
                     if (supabase) {
-                        await supabase.from('calls').insert([{
-                            room_id: this.room.id,
-                            sender: this.myId,
-                            type: type,
-                            data: data,
-                            created_at: new Date().toISOString()
-                        }]);
+                        try {
+                            await supabase.from('calls').insert([{
+                                room_id: this.room.id,
+                                sender: this.myId,
+                                type: type,
+                                data: data,
+                                created_at: new Date().toISOString()
+                            }]);
+                        } catch (e) {
+                            console.warn('Ошибка отправки сигнала в Supabase', e);
+                        }
                     }
                 } catch (e) {
                     console.error('Ошибка отправки сигнала:', e);
@@ -1141,7 +1202,9 @@
                 this.audioElements = {};
                 this.pendingCandidates = {};
                 if (this.channel && supabase) {
-                    supabase.removeChannel(this.channel);
+                    try {
+                        supabase.removeChannel(this.channel);
+                    } catch (e) {}
                     this.channel = null;
                 }
                 this.status = 'idle';
@@ -1154,7 +1217,7 @@
         }
 
         // ------------------------------------------------------------
-        // 16. ЗАПУСК
+        // 17. Запуск
         // ------------------------------------------------------------
         try {
             await initUsers();
@@ -1172,7 +1235,6 @@
             `;
         }
 
-        // При закрытии вкладки – выходим
         window.addEventListener('beforeunload', async () => {
             if (currentUser && supabase) {
                 try {
