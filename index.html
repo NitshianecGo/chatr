@@ -226,16 +226,14 @@
         function playCallConnected() { playBeep(1200, 100); setTimeout(()=>playBeep(1500, 100), 200); }
 
         // ─── Supabase ────────────────────────────────────────────────
-        // ЗАМЕНИТЕ НА СВОИ ДАННЫЕ!
-        const SUPABASE_URL = 'https://ваш-проект.supabase.co';
-        const SUPABASE_ANON_KEY = 'ваш-анонимный-ключ';
+        // ВАШИ КЛЮЧИ
+        const SUPABASE_URL = 'https://uqtiieyrjzcqulpojlfd.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S';
 
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
-      const supabase = createClient(
-    'https://uqtiieyrjzcqulpojlfd.supabase.co',
-    'sb_publishable_QJh4luSzJhlq2iPdsaas8g_F6ZnCF9S',
-    { auth: { persistSession: false } }
-);
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false }
+        });
 
         // ─── Предустановленные пользователи ────────────────────────
         const USERS = {
@@ -311,16 +309,21 @@
         }
 
         async function loadRooms() {
-            const { data, error } = await supabase
-                .from('rooms')
-                .select('*')
-                .contains('participants', [currentUser.login]);
-            if (error) {
-                alert('Ошибка загрузки комнат');
-                console.error(error);
-                return;
+            try {
+                const { data, error } = await supabase
+                    .from('rooms')
+                    .select('*')
+                    .contains('participants', [currentUser.login]);
+                if (error) {
+                    console.error('Ошибка загрузки комнат:', error);
+                    alert('Ошибка загрузки комнат: ' + error.message);
+                    return;
+                }
+                renderChatList(data || []);
+            } catch (e) {
+                alert('Ошибка подключения: ' + e.message);
+                console.error(e);
             }
-            renderChatList(data || []);
         }
 
         function renderChatList(rooms) {
@@ -369,63 +372,69 @@
             if (!partner) return;
             if (!USERS[partner]) { alert('Такого пользователя нет'); return; }
             if (partner === currentUser.login) { alert('Нельзя создать чат с собой'); return; }
-            const { data: existing } = await supabase
-                .from('rooms')
-                .select('id')
-                .contains('participants', [currentUser.login, partner])
-                .maybeSingle();
-            if (existing) {
-                alert('Чат уже существует');
-                return;
+            try {
+                const { data: existing } = await supabase
+                    .from('rooms')
+                    .select('id')
+                    .contains('participants', [currentUser.login, partner])
+                    .maybeSingle();
+                if (existing) {
+                    alert('Чат уже существует');
+                    return;
+                }
+                const { data, error } = await supabase
+                    .from('rooms')
+                    .insert([{ participants: [currentUser.login, partner] }])
+                    .select()
+                    .single();
+                if (error) throw error;
+                enterRoom(data);
+            } catch (e) {
+                alert('Ошибка создания чата: ' + e.message);
+                console.error(e);
             }
-            const { data, error } = await supabase
-                .from('rooms')
-                .insert([{ participants: [currentUser.login, partner] }])
-                .select()
-                .single();
-            if (error) { alert('Ошибка создания'); console.error(error); return; }
-            enterRoom(data);
         }
 
         // ─── Вход в комнату ──────────────────────────────────────────
         async function enterRoom(room) {
             currentRoom = room;
-            const { data, error } = await supabase
-                .from('messages')
-                .select('*')
-                .eq('room_id', room.id)
-                .order('created_at', { ascending: true });
-            if (error) {
-                alert('Ошибка загрузки сообщений');
-                console.error(error);
-                return;
+            try {
+                const { data, error } = await supabase
+                    .from('messages')
+                    .select('*')
+                    .eq('room_id', room.id)
+                    .order('created_at', { ascending: true });
+                if (error) throw error;
+                messages = data || [];
+                renderChatWindow(room);
+                // Подписка на новые сообщения
+                if (messagesSubscription) {
+                    supabase.removeChannel(messagesSubscription);
+                    messagesSubscription = null;
+                }
+                messagesSubscription = supabase
+                    .channel(`room-${room.id}`)
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'messages',
+                        filter: `room_id=eq.${room.id}`
+                    }, (payload) => {
+                        messages.push(payload.new);
+                        renderMessages();
+                        playNotification();
+                    })
+                    .subscribe();
+                // Инициализация звонков
+                if (callManager) {
+                    callManager.cleanup();
+                    callManager = null;
+                }
+                callManager = new CallManager(room, currentUser.login);
+            } catch (e) {
+                alert('Ошибка загрузки сообщений: ' + e.message);
+                console.error(e);
             }
-            messages = data || [];
-            renderChatWindow(room);
-            // Подписка на новые сообщения
-            if (messagesSubscription) {
-                supabase.removeChannel(messagesSubscription);
-                messagesSubscription = null;
-            }
-            messagesSubscription = supabase
-                .channel(`room-${room.id}`)
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `room_id=eq.${room.id}`
-                }, (payload) => {
-                    messages.push(payload.new);
-                    renderMessages();
-                    playNotification();
-                })
-                .subscribe();
-            // Инициализация звонков
-            if (callManager) {
-                callManager.cleanup();
-                callManager = null;
-            }
-            callManager = new CallManager(room, currentUser.login);
         }
 
         function renderChatWindow(room) {
@@ -521,10 +530,12 @@
                 type: 'text',
                 created_at: new Date().toISOString()
             };
-            const { error } = await supabase.from('messages').insert([msg]);
-            if (error) {
-                alert('Ошибка отправки');
-                console.error(error);
+            try {
+                const { error } = await supabase.from('messages').insert([msg]);
+                if (error) throw error;
+            } catch (e) {
+                alert('Ошибка отправки: ' + e.message);
+                console.error(e);
             }
         }
 
@@ -581,10 +592,12 @@
                 type: file.type.startsWith('image/') ? 'image' : 'video',
                 created_at: new Date().toISOString()
             };
-            const { error } = await supabase.from('messages').insert([msg]);
-            if (error) {
-                alert('Ошибка отправки медиа');
-                console.error(error);
+            try {
+                const { error } = await supabase.from('messages').insert([msg]);
+                if (error) throw error;
+            } catch (e) {
+                alert('Ошибка отправки медиа: ' + e.message);
+                console.error(e);
             }
         }
 
@@ -613,7 +626,12 @@
                             type: 'audio',
                             created_at: new Date().toISOString()
                         };
-                        await supabase.from('messages').insert([msg]);
+                        try {
+                            await supabase.from('messages').insert([msg]);
+                        } catch (e) {
+                            alert('Ошибка отправки аудио: ' + e.message);
+                            console.error(e);
+                        }
                         stream.getTracks().forEach(t => t.stop());
                     };
                     reader.readAsDataURL(blob);
@@ -807,13 +825,17 @@
             }
 
             async sendSignal(type, data) {
-                await supabase.from('calls').insert([{
-                    room_id: this.room.id,
-                    sender: this.myLogin,
-                    type: type,
-                    data: data,
-                    created_at: new Date().toISOString()
-                }]);
+                try {
+                    await supabase.from('calls').insert([{
+                        room_id: this.room.id,
+                        sender: this.myLogin,
+                        type: type,
+                        data: data,
+                        created_at: new Date().toISOString()
+                    }]);
+                } catch (e) {
+                    console.error('Ошибка отправки сигнала:', e);
+                }
             }
 
             showCallingUI(text) {
@@ -864,36 +886,9 @@
         // ─── Запуск приложения ──────────────────────────────────────
         renderLogin();
 
-        // ─── Инструкция по настройке Supabase (комментарий) ──────
-        /*
-            Для работы приложения необходимо:
-            1. Создать проект на supabase.com.
-            2. В SQL Editor выполнить:
-               CREATE TABLE rooms (
-                   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                   participants TEXT[] NOT NULL,
-                   created_at TIMESTAMPTZ DEFAULT NOW(),
-                   last_message TEXT
-               );
-               CREATE TABLE messages (
-                   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                   room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
-                   sender TEXT NOT NULL,
-                   content TEXT NOT NULL,
-                   type TEXT DEFAULT 'text',
-                   created_at TIMESTAMPTZ DEFAULT NOW()
-               );
-               CREATE TABLE calls (
-                   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                   room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
-                   sender TEXT NOT NULL,
-                   type TEXT NOT NULL,
-                   data JSONB,
-                   created_at TIMESTAMPTZ DEFAULT NOW()
-               );
-            3. Включить Realtime для таблиц messages и calls (Database → Replication).
-            4. Заменить SUPABASE_URL и SUPABASE_ANON_KEY на свои.
-        */
+        // ─── Инструкция (в консоль) ──────────────────────────────
+        console.log('✅ Приложение запущено. Используйте логины: ivan, petr, elena, olga, sergey (пароль 123).');
+        console.log('📌 Убедитесь, что в Supabase созданы таблицы и отключена RLS (или добавлены политики).');
     </script>
 </body>
 </html>
